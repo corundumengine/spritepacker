@@ -82,13 +82,13 @@ std::expected<std::tuple<int, int>, std::string> parse_size(std::string_view siz
   auto [p1, ec1] = std::from_chars(begin, mid, w);
   if (ec1 == std::errc::result_out_of_range)
     return std::unexpected(std::format("Size value out of range in '{}'", size_str));
-  if (ec1 != std::errc{})
+  if (ec1 != std::errc{} || p1 != mid)
     return std::unexpected(std::format("Invalid size format '{}'. Use 'WxH' (e.g., '64x64')", size_str));
 
   auto [p2, ec2] = std::from_chars(mid + 1, end, h);
   if (ec2 == std::errc::result_out_of_range)
     return std::unexpected(std::format("Size value out of range in '{}'", size_str));
-  if (ec2 != std::errc{})
+  if (ec2 != std::errc{} || p2 != end)
     return std::unexpected(std::format("Invalid size format '{}'. Use 'WxH' (e.g., '64x64')", size_str));
 
   if (w <= 0 || h <= 0)

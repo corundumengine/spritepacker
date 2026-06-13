@@ -65,6 +65,24 @@ TEST_SUITE("parse_size") {
     CHECK_FALSE(result);
     CHECK(result.error().find("out of range") != std::string::npos);
   }
+
+  TEST_CASE("trailing characters after height is invalid") {
+    auto result = parse_size("64x32trailing");
+    CHECK_FALSE(result);
+    CHECK(result.error().find("Invalid size format") != std::string::npos);
+  }
+
+  TEST_CASE("garbage between width and delimiter is invalid") {
+    auto result = parse_size("64abcx32");
+    CHECK_FALSE(result);
+    CHECK(result.error().find("Invalid size format") != std::string::npos);
+  }
+
+  TEST_CASE("missing width is invalid") {
+    auto result = parse_size("x32");
+    CHECK_FALSE(result);
+    CHECK(result.error().find("Invalid size format") != std::string::npos);
+  }
 }
 
 TEST_SUITE("glob_to_regex") {
