@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 3.28)
+set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
 project(
   Spritepacker
   VERSION 0.1.0
@@ -10,6 +11,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+include(GNUInstallDirs)
 include(FetchContent)
 
 FetchContent_Declare(nlohmann_json
@@ -17,6 +19,7 @@ FetchContent_Declare(nlohmann_json
     GIT_TAG        v3.12.0
     GIT_SHALLOW    TRUE
     GIT_PROGRESS   TRUE)
+set(JSON_Install OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(nlohmann_json)
 
 FetchContent_Declare(lodepng
@@ -25,13 +28,6 @@ FetchContent_Declare(lodepng
     GIT_SHALLOW    TRUE
     GIT_PROGRESS   TRUE)
 FetchContent_MakeAvailable(lodepng)
-
-FetchContent_Declare(doctest
-    GIT_REPOSITORY https://github.com/doctest/doctest.git
-    GIT_TAG        v2.4.11
-    GIT_SHALLOW    TRUE
-    GIT_PROGRESS   TRUE)
-FetchContent_MakeAvailable(doctest)
 
 configure_file(src/version.hpp.in src/version.hpp)
 
@@ -53,10 +49,20 @@ add_executable(spritepacker src/main.cpp)
 target_link_libraries(spritepacker PRIVATE spritepacker_lib)
 target_compile_options(spritepacker PRIVATE ${WARN_FLAGS})
 
+install(TARGETS spritepacker RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+
 include(CTest)
-enable_testing()
 
 if(BUILD_TESTING)
+  set(DOCTEST_INSTALL OFF CACHE BOOL "" FORCE)
+  FetchContent_Declare(doctest
+      GIT_REPOSITORY https://github.com/doctest/doctest.git
+      GIT_TAG        v2.4.11
+      GIT_SHALLOW    TRUE
+      GIT_PROGRESS   TRUE
+      EXCLUDE_FROM_ALL)
+  FetchContent_MakeAvailable(doctest)
+
   add_executable(spritepacker_tests
         tests/test_main.cpp
         tests/test_utils.cpp

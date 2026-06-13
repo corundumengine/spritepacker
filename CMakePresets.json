@@ -13,16 +13,29 @@
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/build",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug",
-        "CMAKE_POLICY_VERSION_MINIMUM": "3.5"
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "release",
+      "displayName": "Release",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build-release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "BUILD_TESTING": "ON"
       }
     }
   ],
 
   "buildPresets": [
     {
-      "name": "build",
+      "name": "build-debug",
       "configurePreset": "debug"
+    },
+    {
+      "name": "build-release",
+      "configurePreset": "release"
     }
   ]
 }
