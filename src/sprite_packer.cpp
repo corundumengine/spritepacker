@@ -4,7 +4,6 @@
 #include <filesystem>
 #include <format>
 #include <fstream>
-#include <iostream>
 #include <limits>
 #include <lodepng.h>
 #include <nlohmann/json.hpp>
@@ -41,7 +40,7 @@ namespace {
       if (!img.is_valid())
         return std::unexpected(std::format("Invalid sprite (0x0) in: {}", file));
       if (img.width != img.height)
-        std::println(std::cerr, "Warning: Sprite is not square: {} ({}x{})", file, img.width, img.height);
+        std::println(stderr, "Warning: Sprite is not square: {} ({}x{})", file, img.width, img.height);
       max_w = std::max(max_w, img.width);
       max_h = std::max(max_h, img.height);
       images.push_back(std::move(img));
