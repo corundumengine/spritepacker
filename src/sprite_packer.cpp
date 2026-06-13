@@ -37,6 +37,8 @@ namespace {
       Sprite img;
       if (auto result = img.load(file); !result)
         return std::unexpected(std::format("Could not load sprite: {}", file));
+      if (!img.is_valid())
+        return std::unexpected(std::format("Invalid sprite (0x0) in: {}", file));
       if (img.width != img.height)
         std::println(std::cerr, "Warning: Sprite is not square: {} ({}x{})", file, img.width, img.height);
       max_w = std::max(max_w, img.width);
