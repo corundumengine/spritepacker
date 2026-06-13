@@ -5,6 +5,7 @@
 #include <format>
 #include <fstream>
 #include <iostream>
+#include <limits>
 #include <lodepng.h>
 #include <nlohmann/json.hpp>
 #include <print>
@@ -116,8 +117,11 @@ std::expected<PackData, std::string> PackData::from_options(const Options &optio
 
   std::println("Grid: {}x{} ({} sprites per sheet)", layout->cols, layout->rows, layout->sprites_per_sheet());
 
-  const int num_sheets{
-      static_cast<int>((loaded->images.size() + layout->sprites_per_sheet() - 1) / layout->sprites_per_sheet())};
+  const auto num_sheets_val{(loaded->images.size() + static_cast<std::size_t>(layout->sprites_per_sheet()) - 1) /
+                            static_cast<std::size_t>(layout->sprites_per_sheet())};
+  if (num_sheets_val > static_cast<std::size_t>(std::numeric_limits<int>::max()))
+    return std::unexpected(std::format("Too many sheets required ({})", num_sheets_val));
+  const int num_sheets{static_cast<int>(num_sheets_val)};
 
   return PackData{
       .input_files = std::move(*input_files),
