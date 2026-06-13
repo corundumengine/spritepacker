@@ -15,6 +15,7 @@ std::regex glob_to_regex(std::string_view pattern) {
 
   bool in_bracket = false;
   bool next_is_bracket_start = false;
+  std::size_t bracket_chars = 0;
 
   for (char c : pattern) {
     const bool is_bracket_start{next_is_bracket_start};
@@ -26,8 +27,10 @@ std::regex glob_to_regex(std::string_view pattern) {
         in_bracket = false;
       } else if (c == '!' && is_bracket_start) {
         re += '^';
+        ++bracket_chars;
       } else {
         re += c;
+        ++bracket_chars;
       }
     } else {
       switch (c) {
@@ -44,6 +47,7 @@ std::regex glob_to_regex(std::string_view pattern) {
         re += '[';
         in_bracket = true;
         next_is_bracket_start = true;
+        bracket_chars = 0;
         break;
       default:
         if (k_regex_meta.find(c) != std::string_view::npos)
@@ -51,6 +55,15 @@ std::regex glob_to_regex(std::string_view pattern) {
         re += c;
         break;
       }
+    }
+  }
+
+  if (in_bracket) {
+    if (bracket_chars == 0) {
+      re.pop_back();
+      re += "\\[";
+    } else {
+      re += ']';
     }
   }
   return std::regex{re, std::regex::icase};

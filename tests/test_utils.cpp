@@ -146,6 +146,28 @@ TEST_SUITE("glob_to_regex") {
     CHECK(std::regex_match("file!.png", re));
     CHECK_FALSE(std::regex_match("file.png", re));
   }
+
+  TEST_CASE("unclosed bracket with content is auto-closed") {
+    auto re = glob_to_regex("tile[abc");
+    CHECK(std::regex_match("tilea", re));
+    CHECK(std::regex_match("tileb", re));
+    CHECK_FALSE(std::regex_match("tiled", re));
+    CHECK_FALSE(std::regex_match("tile[abc", re));
+  }
+
+  TEST_CASE("unclosed empty bracket matches literal '['") {
+    auto re = glob_to_regex("file[");
+    CHECK(std::regex_match("file[", re));
+    CHECK_FALSE(std::regex_match("file", re));
+    CHECK_FALSE(std::regex_match("filea", re));
+  }
+
+  TEST_CASE("unclosed negated bracket is auto-closed") {
+    auto re = glob_to_regex("tile[!xyz");
+    CHECK(std::regex_match("tileA", re));
+    CHECK_FALSE(std::regex_match("tilex", re));
+    CHECK_FALSE(std::regex_match("tiley", re));
+  }
 }
 
 TEST_SUITE("resolve_input_files") {
