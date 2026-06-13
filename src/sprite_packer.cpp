@@ -36,7 +36,7 @@ namespace {
     for (const auto &file : files) {
       Sprite img;
       if (auto result = img.load(file); !result)
-        return std::unexpected(std::format("Could not load sprite: {}", file));
+        return std::unexpected(std::format("Could not load sprite: {} ({})", file, result.error()));
       if (!img.is_valid())
         return std::unexpected(std::format("Invalid sprite (0x0) in: {}", file));
       if (img.width != img.height)
