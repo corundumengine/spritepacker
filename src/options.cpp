@@ -13,7 +13,7 @@ namespace {
     void (*set_value)(Options &, std::string_view);
   };
 
-  static constexpr OptSpec OPTIONS[] = {
+  constexpr OptSpec OPTIONS[] = {
       {"--help", "-h", false, [](Options &o, std::string_view) { o.show_help = true; }},
       {"--version", "-v", false, [](Options &o, std::string_view) { o.show_version = true; }},
       {"--input", "-i", true, [](Options &o, std::string_view v) { o.input = v; }},
