@@ -198,6 +198,8 @@ std::expected<void, std::string> PackData::write_metadata() const {
       return std::unexpected(std::format("Failed to open JSON file: {}", json_path.string()));
 
     json_file << metadata.dump(2);
+    if (json_file.fail())
+      return std::unexpected(std::format("Failed to write JSON file: {}", json_path.string()));
   }
   return {};
 }
