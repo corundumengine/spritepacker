@@ -36,6 +36,13 @@ Examples:
 }
 
 int main(int argc, char *argv[]) {
+  const char *const program_name{(argc > 0 && argv[0]) ? argv[0] : "spritepacker"};
+
+  if (argc == 0) {
+    std::println(stderr, "Error: argc is zero");
+    return EXIT_FAILURE;
+  }
+
   auto options = Options::parse_args(argc, argv);
 
   if (!options) {
@@ -49,7 +56,7 @@ int main(int argc, char *argv[]) {
   }
 
   if (options->show_help) {
-    print_usage(argv[0]);
+    print_usage(program_name);
     return EXIT_SUCCESS;
   }
 
