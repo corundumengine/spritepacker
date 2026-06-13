@@ -118,7 +118,8 @@ std::expected<std::vector<std::string>, std::string> resolve_input_files(const s
     std::vector<std::filesystem::path> matches;
     std::error_code ec;
     for (const auto &entry : std::filesystem::directory_iterator(source_dir, ec)) {
-      if (entry.is_regular_file() && ext_matches(entry.path()))
+      std::error_code status_ec;
+      if (entry.is_regular_file(status_ec) && !status_ec && ext_matches(entry.path()))
         matches.push_back(entry.path());
     }
     if (ec)
@@ -136,7 +137,8 @@ std::expected<std::vector<std::string>, std::string> resolve_input_files(const s
       token = token.substr(first, last - first + 1);
 
       const std::filesystem::path exact = source_dir / token;
-      if (std::filesystem::exists(exact) && std::filesystem::is_regular_file(exact)) {
+      std::error_code exact_ec;
+      if (std::filesystem::exists(exact) && std::filesystem::is_regular_file(exact, exact_ec) && !exact_ec) {
         if (!ext_matches(exact)) {
           return std::unexpected(
               std::format("File '{}' is not a PNG file (extension: {})", token, exact.extension().string()));
@@ -147,7 +149,8 @@ std::expected<std::vector<std::string>, std::string> resolve_input_files(const s
         std::vector<std::filesystem::path> matches;
         std::error_code ec;
         for (const auto &entry : std::filesystem::directory_iterator(source_dir, ec)) {
-          if (!entry.is_regular_file())
+          std::error_code status_ec;
+          if (!entry.is_regular_file(status_ec) || status_ec)
             continue;
           if (ext_matches(entry.path()) && std::regex_match(entry.path().filename().string(), re))
             matches.push_back(entry.path());
