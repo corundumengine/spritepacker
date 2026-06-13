@@ -61,6 +61,9 @@ std::expected<Options, std::string> Options::parse_args(int argc, char *argv[]) 
       if (opt.has_value) {
         if (++it == args.end())
           return std::unexpected(std::format("Missing value for {}", opt.long_name));
+        if (std::string_view{*it}.starts_with('-'))
+          return std::unexpected(
+              std::format("Unexpected flag '{}' where a value for {} was expected", *it, opt.long_name));
         opt.set_value(opts, *it);
       } else {
         opt.set_value(opts, {});

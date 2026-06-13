@@ -21,6 +21,13 @@ TEST_SUITE("Options::parse_args") {
     CHECK_FALSE(result);
     CHECK(result.error().find("Unknown argument '--foo'") != std::string::npos);
   }
+
+  TEST_CASE("rejects flag where value is expected") {
+    const char *argv[] = {"prog", "--input", "-h"};
+    auto result = Options::parse_args(std::size(argv), const_cast<char **>(argv));
+    CHECK_FALSE(result);
+    CHECK(result.error().find("Unexpected flag") != std::string::npos);
+  }
 }
 
 TEST_SUITE("Options::validate") {
