@@ -7,6 +7,18 @@ A CLI tool for packing sprite frames into texture atlases. Pre-alpha.
 
 ## Build
 
+### Release
+
+```bash
+cmake --preset release
+cmake --build build-release
+cmake --install build-release --prefix dist
+```
+
+The executable will be at `dist/bin/spritepacker`.
+
+### Debug
+
 ```bash
 cmake --preset debug
 cmake --build build
@@ -60,6 +72,14 @@ For each atlas, Spritepacker generates:
 - **`{name}.json`** — Metadata describing the sprite sheet layout.
 
 ## Testing
+
+The release preset enables tests by default. Run:
+
+```bash
+ctest --test-dir build-release --output-on-failure
+```
+
+Or with a debug build:
 
 ```bash
 ctest --test-dir build --output-on-failure
