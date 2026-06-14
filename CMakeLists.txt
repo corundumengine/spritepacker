@@ -56,7 +56,7 @@ if(BUILD_TESTING)
   set(DOCTEST_INSTALL OFF CACHE BOOL "" FORCE)
   FetchContent_Declare(doctest
       GIT_REPOSITORY https://github.com/doctest/doctest.git
-      GIT_TAG        v2.4.11
+      GIT_TAG        v2.5.2
       GIT_SHALLOW    TRUE
       GIT_PROGRESS   TRUE
       EXCLUDE_FROM_ALL)
