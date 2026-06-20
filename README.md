@@ -1,9 +1,9 @@
+# Spritepacker
+
 [![Language](https://img.shields.io/badge/language-C++-blue.svg)](https://isocpp.org/)
 [![Standard](https://img.shields.io/badge/c%2B%2B-23-blue.svg)](https://en.wikipedia.org/wiki/C%2B%2B17)
 
-# Spritepacker
-
-A CLI tool for packing sprite frames into texture atlases. Pre-alpha.
+A CLI tool for packing sprite frames into texture atlases. **Pre-alpha — under active development, expect breakage.**
 
 ## Build
 
@@ -71,6 +71,14 @@ For each atlas, Spritepacker generates:
 - **`{name}.png`** — The packed texture atlas image.
 - **`{name}.json`** — Metadata describing the sprite sheet layout.
 
+## Dependencies
+
+| Library                                           | Purpose             |
+| ------------------------------------------------- | ------------------- |
+| [nlohmann/json](https://github.com/nlohmann/json) | JSON parsing/output |
+| [lodepng](https://github.com/lvandeve/lodepng)    | PNG encoding        |
+| [doctest](https://github.com/doctest/doctest)     | Unit testing        |
+
 ## Testing
 
 The release preset enables tests by default. Run:
@@ -84,3 +92,7 @@ Or with a debug build:
 ```bash
 ctest --test-dir build --output-on-failure
 ```
+
+## License
+
+Apache-2.0 — see [LICENSE](LICENSE) for details.
