@@ -1,7 +1,7 @@
 # Spritepacker
 
 [![Language](https://img.shields.io/badge/language-C++-blue.svg)](https://isocpp.org/)
-[![Standard](https://img.shields.io/badge/c%2B%2B-23-blue.svg)](https://en.wikipedia.org/wiki/C%2B%2B17)
+[![Standard](https://img.shields.io/badge/c%2B%2B-23-blue.svg)](https://en.wikipedia.org/wiki/C%2B%2B23)
 
 A CLI tool for packing sprite frames into texture atlases. **Pre-alpha — under active development, expect breakage.**
 
