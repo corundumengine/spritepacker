@@ -10,17 +10,20 @@ void print_usage(const char *program_name) {
   std::println(R"(spritepacker v{1}
 Packs PNG sprites from a source directory into one or more atlas sheets.
 
-Usage: {0} --input <dir> --output <dir> --name <name> [--files <list>] [--size WxH] [--max-size WxH]
+Usage: {0} --input <dir> --sheets <dir> --name <name> [--files <list>] [--size WxH] [--max-size WxH] [--character] [--margin N] [--assets <dir>]
 
 Options:
-  --input,    -i <dir>   Source directory containing PNG files
-  --output,   -o <dir>   Output directory for PNG and JSON files
-  --name,     -n <name>  Base name for output (e.g., "terrain" → terrain.png, terrain.json)
-  --files,    -f <list>  Comma-separated filenames or wildcard patterns (default: *.png)
-  --size,     -s WxH     Frame size (e.g., "64x64"). Omit to auto-detect from input files.
-  --max-size, -m WxH     Maximum atlas size (default: 2048x2048)
-  --version,  -v         Show version
-  --help,     -h         Show this message
+  --input,      -i <dir>   Source directory containing PNG files
+  --sheets      <dir>      Output directory for JSON sheet metadata
+  --assets      <dir>      Output directory for PNG sprite sheets (default: same as --sheets)
+  --name,       -n <name>  Base name for output (e.g., "terrain" → terrain.png, terrain.json)
+  --files,      -f <list>  Comma-separated filenames or wildcard patterns (default: *.png)
+  --size,       -s WxH     Frame size (e.g., "64x64"). Omit to auto-detect from input files.
+  --max-size,   -m WxH     Maximum atlas size (default: 2048x2048)
+  --character              Character sheet mode — no crop, output frame_width/frame_height
+  --margin      N          Transparent bleed pixels added around cropped bounding box (default: 2)
+  --version,    -v         Show version
+  --help,       -h         Show this message
 
 File selection notes:
   --files accepts exact filenames or wildcard patterns (* and ? supported), separated by commas.
@@ -28,9 +31,11 @@ File selection notes:
   Exact filenames are added in the order listed; wildcard matches are sorted alphabetically.
 
 Examples:
-  {0} --input tiles/terrain --output game/data/sprite_sheets --name terrain
-  {0} --input tiles/objects --files chest_open.png,chest_closed.png,chest_gold.png --output game/data/sprite_sheets --name chests
-  {0} -i tiles/objects -f chest_*.png -o game/data/sprite_sheets -n chests -s 32x32
+  {0} --input tiles/terrain --sheets game/data/sprite_sheets --name terrain
+  {0} --input tiles/objects --files chest_open.png,chest_closed.png,chest_gold.png --sheets game/data/sprite_sheets --name chests
+  {0} -i tiles/objects -f chest_*.png --sheets game/data/sprite_sheets -n chests -s 32x32
+  {0} -i raw_frames/ --sheets out/ -n hero --character --size 64x96
+  {0} -i tiles/ --sheets metadata/ --assets assets/textures/ -n terrain
 )",
                program_name, SPRITEPACKER_VERSION);
 }
@@ -66,7 +71,7 @@ int main(int argc, char *argv[]) {
     return EXIT_FAILURE;
   }
 
-  std::println("Creating {} sheet(s) in {}...", pack_data->num_sheets, pack_data->output_dir.string());
+  std::println("Creating {} sheet(s) in {}...", pack_data->num_sheets, pack_data->assets_dir.string());
   if (auto result = pack_data->pack(); !result) {
     std::println(stderr, "Error: {}", result.error());
     return EXIT_FAILURE;
@@ -77,7 +82,7 @@ int main(int argc, char *argv[]) {
     std::println(stderr, "Error: {}", result.error());
     return EXIT_FAILURE;
   }
-  std::println("Wrote metadata files in {}.", pack_data->output_dir.string());
+  std::println("Wrote metadata files in {}.", pack_data->sheets_dir.string());
 
   std::println("Done!");
 

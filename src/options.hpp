@@ -8,14 +8,17 @@
 struct Options {
   std::string input;
   std::string files; // comma-separated filenames or glob patterns; empty means all PNGs
-  std::string output;
+  std::string sheets;
+  std::string assets;
   std::string name;     // base name for output files, e.g. "terrain" → terrain.png, terrain.json
   std::string size;     // optional frame size in "WxH" format
   std::string max_size; // optional maximum atlas size in "WxH" format
+  bool character{false};
+  int margin{2};
   bool show_help{false};
   bool show_version{false};
 
-  /** Checks that source, output, and name are non-empty. */
+  /** Checks that source, sheets, and name are non-empty. */
   [[nodiscard]] std::expected<void, std::string> validate() const;
 
   /**

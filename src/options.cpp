@@ -1,9 +1,12 @@
 #include "options.hpp"
 
+#include <charconv>
 #include <format>
 #include <ranges>
 #include <span>
+#include <stdexcept>
 #include <string_view>
+#include <system_error>
 
 namespace {
   struct OptSpec {
@@ -18,18 +21,30 @@ namespace {
       {"--version", "-v", false, [](Options &o, std::string_view) { o.show_version = true; }},
       {"--input", "-i", true, [](Options &o, std::string_view v) { o.input = v; }},
       {"--files", "-f", true, [](Options &o, std::string_view v) { o.files = v; }},
-      {"--output", "-o", true, [](Options &o, std::string_view v) { o.output = v; }},
+      {"--sheets", "", true, [](Options &o, std::string_view v) { o.sheets = v; }},
+      {"--assets", "", true, [](Options &o, std::string_view v) { o.assets = v; }},
       {"--name", "-n", true, [](Options &o, std::string_view v) { o.name = v; }},
       {"--size", "-s", true, [](Options &o, std::string_view v) { o.size = v; }},
       {"--max-size", "-m", true, [](Options &o, std::string_view v) { o.max_size = v; }},
+      {"--character", "", false, [](Options &o, std::string_view) { o.character = true; }},
+      {"--margin", "", true,
+       [](Options &o, std::string_view v) {
+         int val{};
+         const std::from_chars_result result = std::from_chars(v.data(), v.data() + v.size(), val);
+         if (result.ec != std::errc{})
+           throw std::runtime_error("--margin must be an integer");
+         if (val < 0)
+           throw std::runtime_error("--margin must be >= 0");
+         o.margin = val;
+       }},
   };
 } // namespace
 
 std::expected<void, std::string> Options::validate() const {
   if (input.empty())
     return std::unexpected("Missing required argument: --input");
-  if (output.empty())
-    return std::unexpected("Missing required argument: --output");
+  if (sheets.empty())
+    return std::unexpected("Missing required argument: --sheets");
   if (name.empty())
     return std::unexpected("Missing required argument: --name");
   return {};
@@ -64,9 +79,17 @@ std::expected<Options, std::string> Options::parse_args(int argc, char *argv[]) 
         if (std::string_view{*it}.starts_with('-'))
           return std::unexpected(
               std::format("Unexpected flag '{}' where a value for {} was expected", *it, opt.long_name));
-        opt.set_value(opts, *it);
+        try {
+          opt.set_value(opts, *it);
+        } catch (const std::runtime_error &e) {
+          return std::unexpected(e.what());
+        }
       } else {
-        opt.set_value(opts, {});
+        try {
+          opt.set_value(opts, {});
+        } catch (const std::runtime_error &e) {
+          return std::unexpected(e.what());
+        }
       }
 
       // Go to the next argument after a match
