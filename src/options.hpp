@@ -13,8 +13,6 @@ struct Options {
   std::string name;     // base name for output files, e.g. "terrain" → terrain.png, terrain.json
   std::string size;     // optional frame size in "WxH" format
   std::string max_size; // optional maximum atlas size in "WxH" format
-  bool character{false};
-  int margin{2};
   bool show_help{false};
   bool show_version{false};
 

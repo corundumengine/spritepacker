@@ -13,6 +13,9 @@ using json = nlohmann::json;
 
 namespace fs = std::filesystem;
 
+constexpr int k_default_max_atlas_dim{2048};
+constexpr int k_bytes_per_pixel{4};
+
 namespace {
 
   std::expected<std::pair<int, int>, std::string> parse_or_default(const std::string &s, int dw, int dh) {
@@ -54,65 +57,47 @@ namespace {
     return base / std::format("{}{}{}", data.output_name, suffix, ext);
   }
 
-  void blit_sprite(const Sprite &sprite, Atlas &atlas, int dest_x, int dest_y) {
-    for (int sy = 0; sy < sprite.height; ++sy) {
-      const auto src = static_cast<std::size_t>(sy * sprite.width * 4);
-      const auto dst = static_cast<std::size_t>(((dest_y + sy) * atlas.width + dest_x) * 4);
-      std::copy_n(sprite.data.data() + src, sprite.width * 4, atlas.data.data() + dst);
+  void blit_sprite(const Sprite &sprite, Atlas &atlas, int dest_x, int dest_y, int max_rows) {
+    const int copy_h = std::min(sprite.height, max_rows);
+    const int src_offset_y = sprite.height > max_rows ? (sprite.height - max_rows) / 2 : 0;
+    for (int sy = 0; sy < copy_h; ++sy) {
+      const int src_y = dest_y + sy;
+      if (src_y >= atlas.height)
+        break;
+      const int sprite_row = src_offset_y + sy;
+      const auto src = static_cast<std::size_t>(sprite_row * sprite.width * k_bytes_per_pixel);
+      const auto dst = static_cast<std::size_t>((src_y * atlas.width + dest_x) * k_bytes_per_pixel);
+      const int copy_w = std::min(sprite.width, atlas.width - dest_x);
+      if (copy_w > 0)
+        std::copy_n(sprite.data.data() + src, static_cast<std::size_t>(copy_w) * k_bytes_per_pixel,
+                    atlas.data.data() + dst);
     }
   }
 
 } // namespace
 
-CropRect find_visible_bounds(const Sprite &sprite) noexcept {
-  if (!sprite.is_valid())
-    return {};
-
-  int min_x = sprite.width, min_y = sprite.height;
-  int max_x = -1, max_y = -1;
-
-  for (int y = 0; y < sprite.height; ++y) {
-    for (int x = 0; x < sprite.width; ++x) {
-      if (sprite.data[static_cast<std::size_t>((y * sprite.width + x) * 4 + 3)] > 0) {
-        min_x = std::min(min_x, x);
-        min_y = std::min(min_y, y);
-        max_x = std::max(max_x, x);
-        max_y = std::max(max_y, y);
-      }
-    }
-  }
-
-  if (max_x < 0)
-    return {};
-
-  return {min_x, min_y, max_x - min_x + 1, max_y - min_y + 1};
-}
-
 std::expected<PackData, std::string> PackData::from_options(const Options &options) {
   const fs::path source_dir{options.input};
-  if (!fs::exists(source_dir) || !fs::is_directory(source_dir)) {
+  if (!fs::exists(source_dir) || !fs::is_directory(source_dir))
     return std::unexpected(std::format("Source directory does not exist: {}", options.input));
-  }
 
   const fs::path sheets_dir{options.sheets};
-  if (!fs::exists(sheets_dir) || !fs::is_directory(sheets_dir)) {
+  if (!fs::exists(sheets_dir) || !fs::is_directory(sheets_dir))
     return std::unexpected(std::format("Sheets directory does not exist: {}", options.sheets));
-  }
 
   fs::path assets_dir = sheets_dir;
   if (!options.assets.empty()) {
     assets_dir = fs::path{options.assets};
-    if (!fs::exists(assets_dir) || !fs::is_directory(assets_dir)) {
+    if (!fs::exists(assets_dir) || !fs::is_directory(assets_dir))
       return std::unexpected(std::format("Assets directory does not exist: {}", options.assets));
-    }
   }
 
   const auto frame_size = parse_or_default(options.size, 0, 0);
   if (!frame_size)
     return std::unexpected(frame_size.error());
-  const auto [frame_hint_w, frame_hint_h] = *frame_size;
+  const auto [hint_w, hint_h] = *frame_size;
 
-  const auto max_size = parse_or_default(options.max_size, 2048, 2048);
+  const auto max_size = parse_or_default(options.max_size, k_default_max_atlas_dim, k_default_max_atlas_dim);
   if (!max_size)
     return std::unexpected(max_size.error());
   const auto [max_w, max_h] = *max_size;
@@ -129,62 +114,18 @@ std::expected<PackData, std::string> PackData::from_options(const Options &optio
   if (!loaded)
     return std::unexpected(loaded.error());
 
-  std::vector<CropRect> crops;
-  int usable_w{};
-  int usable_h{};
-  int max_cw{};
-  int max_ch{};
+  const int frame_w{hint_w ? hint_w : loaded->max_width};
+  const int frame_h{hint_h ? hint_h : loaded->max_height};
 
-  if (options.character) {
-    usable_w = loaded->max_width;
-    usable_h = loaded->max_height;
-  } else {
-    crops.resize(loaded->images.size());
-    for (std::size_t i = 0; i < loaded->images.size(); ++i) {
-      crops[i] = find_visible_bounds(loaded->images[i]);
-      if (crops[i].w == 0 || crops[i].h == 0) {
-        std::println(stderr, "Warning: fully transparent sprite skipped");
-        crops[i] = {0, 0, 1, 1};
-      }
-      CropRect &c = crops[i];
-      const int left = std::max(0, c.x - options.margin);
-      const int top = std::max(0, c.y - options.margin);
-      const int right = std::min(loaded->images[i].width - 1, c.x + c.w - 1 + options.margin);
-      const int bottom = std::min(loaded->images[i].height - 1, c.y + c.h - 1 + options.margin);
-      c.x = left;
-      c.y = top;
-      c.w = right - left + 1;
-      c.h = bottom - top + 1;
-
-      max_cw = std::max(max_cw, c.w);
-      max_ch = std::max(max_ch, c.h);
-    }
-    usable_w = max_cw;
-    usable_h = max_ch;
-  }
-
-  const int frame_w{frame_hint_w ? frame_hint_w : usable_w};
-  const int frame_h{frame_hint_h ? frame_hint_h : usable_h};
+  if (hint_w && (loaded->max_width > hint_w || loaded->max_height > hint_h))
+    std::println(stderr, "Warning: --size {}x{} is smaller than the largest sprite ({}x{})",
+                 hint_w, hint_h, loaded->max_width, loaded->max_height);
 
   if (frame_w == 0 || frame_h == 0)
     return std::unexpected(std::format("Invalid frame size: {}x{}", frame_w, frame_h));
 
-  std::string_view frame_suffix;
-  if (!frame_hint_w)
-    frame_suffix = options.character ? " (auto-detected)" : " (auto-detected from crop)";
+  const std::string_view frame_suffix{!hint_w ? " (auto-detected)" : ""};
   std::println("Frame size: {}x{}{}", frame_w, frame_h, frame_suffix);
-
-  if (options.character) {
-    for (const auto &sprite : loaded->images) {
-      if (sprite.width > frame_w || sprite.height > frame_h)
-        return std::unexpected(
-            std::format("Sprite {}x{} exceeds frame size {}x{}", sprite.width, sprite.height, frame_w, frame_h));
-    }
-  } else {
-    if (max_cw > frame_w || max_ch > frame_h)
-      return std::unexpected(std::format("--size {}x{} is too small for the largest cropped sprite ({}x{})", frame_w,
-                                         frame_h, max_cw, max_ch));
-  }
 
   const auto layout = compute_layout(max_w, max_h, frame_w, frame_h);
   if (!layout)
@@ -208,9 +149,6 @@ std::expected<PackData, std::string> PackData::from_options(const Options &optio
       .frame_height = frame_h,
       .layout = *layout,
       .num_sheets = num_sheets,
-      .character = options.character,
-      .margin = options.margin,
-      .crops = std::move(crops),
   };
 }
 
@@ -237,7 +175,7 @@ std::expected<void, std::string> PackData::pack() const {
     const int atlas_h{layout.rows * frame_height};
 
     Atlas atlas{
-        .data = std::vector<uint8_t>(static_cast<std::size_t>(atlas_w * atlas_h * 4), 0),
+        .data = std::vector<uint8_t>(static_cast<std::size_t>(atlas_w * atlas_h * k_bytes_per_pixel), 0),
         .width = atlas_w,
         .height = atlas_h,
     };
@@ -248,19 +186,7 @@ std::expected<void, std::string> PackData::pack() const {
         const Sprite &sprite = images[static_cast<std::size_t>(sprite_idx)];
         const int cell_x = col * frame_width;
         const int cell_y = row * frame_height;
-
-        if (character) {
-          blit_sprite(sprite, atlas, cell_x, cell_y);
-        } else {
-          const CropRect &crop = crops[static_cast<std::size_t>(sprite_idx)];
-          const int blit_x = cell_x + (frame_width - crop.w) / 2;
-          const int blit_y = cell_y + frame_height - crop.h;
-          for (int sr = 0; sr < crop.h; ++sr) {
-            const auto src = static_cast<std::size_t>(((crop.y + sr) * sprite.width + crop.x) * 4);
-            const auto dst = static_cast<std::size_t>(((blit_y + sr) * atlas.width + blit_x) * 4);
-            std::copy_n(sprite.data.data() + src, static_cast<std::size_t>(crop.w) * 4, atlas.data.data() + dst);
-          }
-        }
+        blit_sprite(sprite, atlas, cell_x, cell_y, frame_height);
         ++sprite_idx;
       }
     }
@@ -281,20 +207,12 @@ std::expected<void, std::string> PackData::write_metadata() const {
     metadata["path"] = png_path.string();
     metadata["columns"] = layout.cols;
     metadata["rows"] = layout.rows;
-
-    if (character) {
-      metadata["frame_width"] = frame_width;
-      metadata["frame_height"] = frame_height;
-      metadata["offset_x"] = 0;
-      metadata["offset_y"] = 0;
-      metadata["spacing_x"] = 0;
-      metadata["spacing_y"] = 0;
-    } else {
-      metadata["tile_width"] = frame_width;
-      metadata["tile_height"] = frame_height;
-      metadata["pivot_x"] = 0.5f;
-      metadata["pivot_y"] = 0.0f;
-    }
+    metadata["frame_width"] = frame_width;
+    metadata["frame_height"] = frame_height;
+    metadata["offset_x"] = 0;
+    metadata["offset_y"] = 0;
+    metadata["spacing_x"] = 0;
+    metadata["spacing_y"] = 0;
 
     std::ofstream json_file(json_path);
     if (!json_file)

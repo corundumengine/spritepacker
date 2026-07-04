@@ -1,12 +1,9 @@
 #include "options.hpp"
 
-#include <charconv>
 #include <format>
 #include <ranges>
 #include <span>
-#include <stdexcept>
 #include <string_view>
-#include <system_error>
 
 namespace {
   struct OptSpec {
@@ -26,17 +23,6 @@ namespace {
       {"--name", "-n", true, [](Options &o, std::string_view v) { o.name = v; }},
       {"--size", "-s", true, [](Options &o, std::string_view v) { o.size = v; }},
       {"--max-size", "-m", true, [](Options &o, std::string_view v) { o.max_size = v; }},
-      {"--character", "", false, [](Options &o, std::string_view) { o.character = true; }},
-      {"--margin", "", true,
-       [](Options &o, std::string_view v) {
-         int val{};
-         const std::from_chars_result result = std::from_chars(v.data(), v.data() + v.size(), val);
-         if (result.ec != std::errc{})
-           throw std::runtime_error("--margin must be an integer");
-         if (val < 0)
-           throw std::runtime_error("--margin must be >= 0");
-         o.margin = val;
-       }},
   };
 } // namespace
 
@@ -79,17 +65,9 @@ std::expected<Options, std::string> Options::parse_args(int argc, char *argv[]) 
         if (std::string_view{*it}.starts_with('-'))
           return std::unexpected(
               std::format("Unexpected flag '{}' where a value for {} was expected", *it, opt.long_name));
-        try {
-          opt.set_value(opts, *it);
-        } catch (const std::runtime_error &e) {
-          return std::unexpected(e.what());
-        }
+        opt.set_value(opts, *it);
       } else {
-        try {
-          opt.set_value(opts, {});
-        } catch (const std::runtime_error &e) {
-          return std::unexpected(e.what());
-        }
+        opt.set_value(opts, {});
       }
 
       // Go to the next argument after a match

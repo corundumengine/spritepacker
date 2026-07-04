@@ -10,7 +10,7 @@ void print_usage(const char *program_name) {
   std::println(R"(spritepacker v{1}
 Packs PNG sprites from a source directory into one or more atlas sheets.
 
-Usage: {0} --input <dir> --sheets <dir> --name <name> [--files <list>] [--size WxH] [--max-size WxH] [--character] [--margin N] [--assets <dir>]
+Usage: {0} --input <dir> --sheets <dir> --name <name> [--files <list>] [--size WxH] [--max-size WxH] [--assets <dir>]
 
 Options:
   --input,      -i <dir>   Source directory containing PNG files
@@ -20,8 +20,6 @@ Options:
   --files,      -f <list>  Comma-separated filenames or wildcard patterns (default: *.png)
   --size,       -s WxH     Frame size (e.g., "64x64"). Omit to auto-detect from input files.
   --max-size,   -m WxH     Maximum atlas size (default: 2048x2048)
-  --character              Character sheet mode — no crop, output frame_width/frame_height
-  --margin      N          Transparent bleed pixels added around cropped bounding box (default: 2)
   --version,    -v         Show version
   --help,       -h         Show this message
 
@@ -34,7 +32,6 @@ Examples:
   {0} --input tiles/terrain --sheets game/data/sprite_sheets --name terrain
   {0} --input tiles/objects --files chest_open.png,chest_closed.png,chest_gold.png --sheets game/data/sprite_sheets --name chests
   {0} -i tiles/objects -f chest_*.png --sheets game/data/sprite_sheets -n chests -s 32x32
-  {0} -i raw_frames/ --sheets out/ -n hero --character --size 64x96
   {0} -i tiles/ --sheets metadata/ --assets assets/textures/ -n terrain
 )",
                program_name, SPRITEPACKER_VERSION);

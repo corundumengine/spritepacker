@@ -18,17 +18,6 @@ struct Atlas {
   [[nodiscard]] std::expected<void, std::string> write(const std::filesystem::path &path) const;
 };
 
-/** Bounding box of visible (non-transparent) pixels within a sprite. */
-struct CropRect {
-  int x{};
-  int y{};
-  int w{};
-  int h{};
-};
-
-/** Scans a sprite for visible pixels and returns their bounding box. Returns empty rect if fully transparent. */
-[[nodiscard]] CropRect find_visible_bounds(const Sprite &sprite) noexcept;
-
 /** Computes the grid layout that fits the most sprites within the given atlas dimensions and frame size. */
 [[nodiscard]] std::expected<SheetLayout, std::string> compute_layout(int max_width, int max_height, int frame_w,
                                                                      int frame_h);
@@ -48,9 +37,6 @@ struct PackData {
   int frame_height{};
   SheetLayout layout;
   int num_sheets{};
-  bool character{false};
-  int margin{2};
-  std::vector<CropRect> crops;
 
   /** Validates options, loads all sprites, and computes the full pack data. */
   [[nodiscard]] static std::expected<PackData, std::string> from_options(const Options &options);
