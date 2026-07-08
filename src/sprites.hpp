@@ -31,4 +31,14 @@ struct SheetLayout {
   }
 };
 
+/** The tightest bounding box of a sprite's non-transparent (alpha > 0) pixels, in that sprite's own
+ *  pixel coordinates (top-left origin). A fully-transparent sprite returns {0, 0, width, height} —
+ *  the whole frame, since there's no visible content to trim to. */
+struct TrimRect {
+  int x{}, y{}, w{}, h{};
+};
+
+/** Scans @p sprite's alpha channel for its tightest non-transparent bounding box. */
+[[nodiscard]] TrimRect compute_trim(const Sprite &sprite) noexcept;
+
 #endif // SPRITES_HPP

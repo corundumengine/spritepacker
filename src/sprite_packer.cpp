@@ -117,9 +117,16 @@ std::expected<PackData, std::string> PackData::from_options(const Options &optio
   const int frame_w{hint_w ? hint_w : loaded->max_width};
   const int frame_h{hint_h ? hint_h : loaded->max_height};
 
-  if (hint_w && (loaded->max_width > hint_w || loaded->max_height > hint_h))
-    std::println(stderr, "Warning: --size {}x{} is smaller than the largest sprite ({}x{})",
+  if (hint_w && (loaded->max_width > hint_w || loaded->max_height > hint_h)) {
+    std::println(stderr, "Warning: --size {}x{} is smaller than the largest sprite ({}x{}) — the file(s) below will be",
                  hint_w, hint_h, loaded->max_width, loaded->max_height);
+    std::println(stderr, "cropped (width truncated from the right, height cropped from the center) rather than resized:");
+    for (std::size_t i = 0; i < loaded->images.size(); ++i) {
+      const Sprite &img = loaded->images[i];
+      if (img.width > hint_w || img.height > hint_h)
+        std::println(stderr, "  {} ({}x{})", fs::path((*input_files)[i]).filename().string(), img.width, img.height);
+    }
+  }
 
   if (frame_w == 0 || frame_h == 0)
     return std::unexpected(std::format("Invalid frame size: {}x{}", frame_w, frame_h));
@@ -213,6 +220,40 @@ std::expected<void, std::string> PackData::write_metadata() const {
     metadata["offset_y"] = 0;
     metadata["spacing_x"] = 0;
     metadata["spacing_y"] = 0;
+
+    // Per-sprite trim: each source sprite may have transparent padding around its actual visible
+    // content (e.g. a mixed-asset pack authored on oversized canvases with generous margins), and
+    // blit_sprite() always places a sprite at (0, 0) of its cell — top/left-anchored, center-cropped
+    // only if the sprite is taller than frame_height. Record the exception cases (trim != full frame)
+    // so a renderer can draw just the visible region at its true position within the frame, instead
+    // of assuming every sprite fills its whole cell edge to edge.
+    json trims = json::array();
+    const int sprites_per_sheet = layout.sprites_per_sheet();
+    int sprite_idx = sheet_idx * sprites_per_sheet;
+    for (int row = 0; row < layout.rows && sprite_idx < static_cast<int>(images.size()); ++row) {
+      for (int col = 0; col < layout.cols && sprite_idx < static_cast<int>(images.size()); ++col) {
+        const Sprite &sprite = images[static_cast<std::size_t>(sprite_idx)];
+        const TrimRect local_trim = compute_trim(sprite);
+
+        // Map from the sprite's own local coordinates to frame-relative coordinates, accounting
+        // for blit_sprite()'s vertical center-crop when the sprite is taller than frame_height.
+        const int src_offset_y = sprite.height > frame_height ? (sprite.height - frame_height) / 2 : 0;
+        int y = local_trim.y - src_offset_y;
+        int h = local_trim.h;
+        if (y < 0) {
+          h += y;
+          y = 0;
+        }
+        if (y + h > frame_height)
+          h = frame_height - y;
+
+        if (h > 0 && (local_trim.x != 0 || y != 0 || local_trim.w != frame_width || h != frame_height))
+          trims.push_back({{"col", col}, {"row", row}, {"x", local_trim.x}, {"y", y}, {"w", local_trim.w}, {"h", h}});
+        ++sprite_idx;
+      }
+    }
+    if (!trims.empty())
+      metadata["trims"] = std::move(trims);
 
     std::ofstream json_file(json_path);
     if (!json_file)
