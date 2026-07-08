@@ -9,6 +9,10 @@
 #include <string>
 #include <vector>
 
+/** The metadata schema version written to each sheet's JSON file. Bump when the schema changes
+ *  in a way that isn't backward-compatible, so engine-side importers can detect a mismatch. */
+inline constexpr int k_metadata_schema_version{2};
+
 /** A composed atlas image assembled in memory from one or more sprites. */
 struct Atlas {
   std::vector<uint8_t> data;
@@ -18,24 +22,41 @@ struct Atlas {
   [[nodiscard]] std::expected<void, std::string> write(const std::filesystem::path &path) const;
 };
 
-/** Computes the grid layout that fits the most sprites within the given atlas dimensions and frame size. */
-[[nodiscard]] std::expected<SheetLayout, std::string> compute_layout(int max_width, int max_height, int frame_w,
-                                                                     int frame_h);
+/**
+ * One packed sprite's placement and metadata, ready to export. `x/y/w/h` describe the trimmed
+ * content's position within its sheet. `trim_x/trim_y` are the offsets from the *original*
+ * (untrimmed) sprite's top-left corner to that trimmed content, and `source_width/source_height`
+ * are the original sprite's dimensions — together these let an engine re-expand the sprite to its
+ * authored bounding box. `pivot_x/pivot_y` are normalized (0..1) coordinates of the sprite's
+ * anchor point within the trimmed box; an isometric engine typically uses pivot_y == 1 (the
+ * sprite's "feet") as its depth-sort key, so no separate sort-hint field is needed.
+ */
+struct PackedSprite {
+  std::string name;
+  int sheet_index{};
+  int x{}, y{}, w{}, h{};
+  int trim_x{}, trim_y{};
+  int source_width{}, source_height{};
+  double pivot_x{}, pivot_y{};
+};
 
 /**
- * All data required to execute a sprite packing operation. Built from CLI
- * options by from_options(), which loads sprites, resolves frame size,
- * computes the atlas layout, and calculates the number of sheets needed.
+ * All data required to execute a sprite packing operation. Built from CLI options by
+ * from_options(), which loads sprites (in parallel), optionally validates directional-animation
+ * naming, trims and deduplicates them, and bin-packs the results into one or more atlas sheets
+ * using MaxRectsPacker.
  */
 struct PackData {
-  std::vector<std::string> input_files;
   std::filesystem::path sheets_dir;
   std::filesystem::path assets_dir;
   std::string output_name;
-  std::vector<Sprite> images;
-  int frame_width{};
-  int frame_height{};
-  SheetLayout layout;
+
+  std::vector<Sprite> unique_images;    // deduplicated sprite pixel data, one entry per unique visual
+  std::vector<TrimRect> unique_trims;   // trim rect for unique_images[i], in that sprite's own coordinates
+  std::vector<PackedSprite> sprites;    // one entry per ORIGINAL input file (duplicates share placement)
+  std::vector<int> sprite_unique_index; // sprites[i] was blitted from unique_images[sprite_unique_index[i]]
+
+  std::vector<std::pair<int, int>> sheet_sizes; // final (width, height) for each sheet
   int num_sheets{};
 
   /** Validates options, loads all sprites, and computes the full pack data. */

@@ -85,6 +85,72 @@ TEST_SUITE("parse_size") {
   }
 }
 
+TEST_SUITE("parse_int") {
+  TEST_CASE("parses a positive integer") {
+    auto result = parse_int("2", "--padding");
+    CHECK(result);
+    CHECK_EQ(*result, 2);
+  }
+
+  TEST_CASE("parses zero") {
+    auto result = parse_int("0", "--padding");
+    CHECK(result);
+    CHECK_EQ(*result, 0);
+  }
+
+  TEST_CASE("rejects a negative value") {
+    auto result = parse_int("-1", "--padding");
+    CHECK_FALSE(result);
+    CHECK(result.error().find("must not be negative") != std::string::npos);
+  }
+
+  TEST_CASE("rejects non-numeric input") {
+    auto result = parse_int("abc", "--padding");
+    CHECK_FALSE(result);
+    CHECK(result.error().find("Invalid integer") != std::string::npos);
+  }
+
+  TEST_CASE("rejects trailing garbage") {
+    auto result = parse_int("2px", "--padding");
+    CHECK_FALSE(result);
+    CHECK(result.error().find("Invalid integer") != std::string::npos);
+  }
+}
+
+TEST_SUITE("validate_animation_naming") {
+  TEST_CASE("passes when all facings of an animation share the same frame set") {
+    const std::vector<std::string> files{
+        "knight_walk_north_0.png",
+        "knight_walk_north_1.png",
+        "knight_walk_south_0.png",
+        "knight_walk_south_1.png",
+    };
+    CHECK(validate_animation_naming(files));
+  }
+
+  TEST_CASE("fails when a facing is missing a frame present in another facing") {
+    const std::vector<std::string> files{
+        "knight_walk_north_0.png",
+        "knight_walk_north_1.png",
+        "knight_walk_south_0.png", // missing frame 1
+    };
+    auto result = validate_animation_naming(files);
+    CHECK_FALSE(result);
+    CHECK(result.error().find("south") != std::string::npos);
+    CHECK(result.error().find("1") != std::string::npos);
+  }
+
+  TEST_CASE("ignores files that don't match the naming convention") {
+    const std::vector<std::string> files{"terrain.png", "chest_open.png", "background.png"};
+    CHECK(validate_animation_naming(files));
+  }
+
+  TEST_CASE("a single facing with no siblings is not flagged") {
+    const std::vector<std::string> files{"knight_walk_north_0.png", "knight_walk_north_1.png"};
+    CHECK(validate_animation_naming(files));
+  }
+}
+
 TEST_SUITE("glob_to_regex") {
   TEST_CASE("star wildcard matches multiple files") {
     auto re = glob_to_regex("*.png");

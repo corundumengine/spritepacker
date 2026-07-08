@@ -13,6 +13,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 include(GNUInstallDirs)
 include(FetchContent)
 
+find_package(Threads REQUIRED)
+
 FetchContent_Declare(nlohmann_json
     GIT_REPOSITORY https://github.com/nlohmann/json.git
     GIT_TAG        v3.12.0
@@ -39,9 +41,10 @@ add_library(spritepacker_lib STATIC
     src/options.cpp
     src/sprites.cpp
     src/utils.cpp
+    src/rect_packer.cpp
     src/sprite_packer.cpp)
 target_include_directories(spritepacker_lib PUBLIC src ${CMAKE_CURRENT_BINARY_DIR}/src)
-target_link_libraries(spritepacker_lib PUBLIC nlohmann_json::nlohmann_json lodepng_lib)
+target_link_libraries(spritepacker_lib PUBLIC nlohmann_json::nlohmann_json lodepng_lib Threads::Threads)
 target_compile_options(spritepacker_lib PRIVATE ${WARN_FLAGS})
 
 add_executable(spritepacker src/main.cpp)
@@ -66,6 +69,7 @@ if(BUILD_TESTING)
         tests/test_main.cpp
         tests/test_utils.cpp
         tests/test_sprites.cpp
+        tests/test_rect_packer.cpp
         tests/test_sprite_packer.cpp
         tests/test_options.cpp)
   target_include_directories(spritepacker_tests PRIVATE src)

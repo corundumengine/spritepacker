@@ -4,10 +4,6 @@
 #include <format>
 #include <lodepng.h>
 
-namespace {
-  constexpr int k_bytes_per_pixel{4};
-}
-
 std::expected<void, std::string> Sprite::load(const std::filesystem::path &path) {
   unsigned w{}, h{};
   const unsigned err{lodepng::decode(data, w, h, path.string())};
@@ -15,6 +11,7 @@ std::expected<void, std::string> Sprite::load(const std::filesystem::path &path)
     return std::unexpected(std::format("Failed to load PNG: {} ({})", path.string(), lodepng_error_text(err)));
   width = static_cast<int>(w);
   height = static_cast<int>(h);
+  name = path.stem().string();
   return {};
 }
 
@@ -34,4 +31,39 @@ TrimRect compute_trim(const Sprite &sprite) noexcept {
   if (max_x < 0) // fully transparent — nothing to trim to, report the whole frame
     return {0, 0, sprite.width, sprite.height};
   return {min_x, min_y, max_x - min_x + 1, max_y - min_y + 1};
+}
+
+std::size_t compute_content_hash(const Sprite &sprite, const TrimRect &trim) noexcept {
+  // FNV-1a over the trimmed pixel region plus its dimensions, so sprites with identical visible
+  // pixels but different trimmed sizes (a degenerate case) don't collide.
+  std::size_t hash{0xcbf29ce484222325ULL};
+  constexpr std::size_t prime{0x100000001b3ULL};
+  auto mix = [&hash](std::size_t v) {
+    hash ^= v;
+    hash *= prime;
+  };
+  mix(static_cast<std::size_t>(trim.w));
+  mix(static_cast<std::size_t>(trim.h));
+  for (int y = 0; y < trim.h; ++y) {
+    const auto row_start = static_cast<std::size_t>(((trim.y + y) * sprite.width + trim.x)) * k_bytes_per_pixel;
+    const auto row_bytes = static_cast<std::size_t>(trim.w) * k_bytes_per_pixel;
+    for (std::size_t i = 0; i < row_bytes; ++i)
+      mix(sprite.data[row_start + i]);
+  }
+  return hash;
+}
+
+bool trimmed_content_equal(const Sprite &a, const TrimRect &trim_a, const Sprite &b, const TrimRect &trim_b) noexcept {
+  if (trim_a.w != trim_b.w || trim_a.h != trim_b.h)
+    return false;
+  for (int y = 0; y < trim_a.h; ++y) {
+    const auto a_row = static_cast<std::size_t>(((trim_a.y + y) * a.width + trim_a.x)) * k_bytes_per_pixel;
+    const auto b_row = static_cast<std::size_t>(((trim_b.y + y) * b.width + trim_b.x)) * k_bytes_per_pixel;
+    const auto row_bytes = static_cast<std::size_t>(trim_a.w) * k_bytes_per_pixel;
+    if (!std::equal(a.data.begin() + static_cast<std::ptrdiff_t>(a_row),
+                    a.data.begin() + static_cast<std::ptrdiff_t>(a_row + row_bytes),
+                    b.data.begin() + static_cast<std::ptrdiff_t>(b_row)))
+      return false;
+  }
+  return true;
 }

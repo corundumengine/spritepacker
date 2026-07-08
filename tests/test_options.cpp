@@ -3,16 +3,26 @@
 
 TEST_SUITE("Options::parse_args") {
   TEST_CASE("parses valid options") {
-    const char *argv[] = {"prog",    "--input",    "/src",   "--sheets", "/out",       "--name",   "atlas",
-                          "--files", "chest*.png", "--size", "32x32",    "--max-size", "1024x1024"};
-    auto result = Options::parse_args(13, const_cast<char **>(argv));
+    const char *argv[] = {"prog",       "--input",    "/src",      "--sheets",  "/out", "--name",  "atlas", "--files",
+                          "chest*.png", "--max-size", "1024x1024", "--padding", "2",    "--pivot", "center"};
+    auto result = Options::parse_args(std::size(argv), const_cast<char **>(argv));
     CHECK(result);
     CHECK_EQ(result->input, "/src");
     CHECK_EQ(result->sheets, "/out");
     CHECK_EQ(result->name, "atlas");
     CHECK_EQ(result->files, "chest*.png");
-    CHECK_EQ(result->size, "32x32");
     CHECK_EQ(result->max_size, "1024x1024");
+    CHECK_EQ(result->padding, "2");
+    CHECK_EQ(result->pivot, "center");
+  }
+
+  TEST_CASE("parses boolean flags") {
+    const char *argv[] = {"prog", "--input", "/src", "--sheets", "/out", "--name", "atlas", "--validate-animations",
+                          "--pot"};
+    auto result = Options::parse_args(std::size(argv), const_cast<char **>(argv));
+    CHECK(result);
+    CHECK(result->validate_animations);
+    CHECK(result->pot);
   }
 
   TEST_CASE("returns an error with invalid arguments") {
@@ -64,5 +74,24 @@ TEST_SUITE("Options::validate") {
     auto result = opts.validate();
     CHECK_FALSE(result);
     CHECK(result.error().find("Missing required argument: --name") != std::string::npos);
+  }
+
+  TEST_CASE("default pivot preset is valid") {
+    Options opts;
+    opts.input = "/src";
+    opts.sheets = "/out";
+    opts.name = "atlas";
+    CHECK(opts.validate());
+  }
+
+  TEST_CASE("unknown pivot preset is rejected") {
+    Options opts;
+    opts.input = "/src";
+    opts.sheets = "/out";
+    opts.name = "atlas";
+    opts.pivot = "bogus";
+    auto result = opts.validate();
+    CHECK_FALSE(result);
+    CHECK(result.error().find("Invalid --pivot value") != std::string::npos);
   }
 }

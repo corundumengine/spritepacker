@@ -4,7 +4,9 @@
 #include <cctype>
 #include <charconv>
 #include <format>
+#include <map>
 #include <ranges>
+#include <set>
 #include <system_error>
 #include <unordered_set>
 
@@ -96,19 +98,31 @@ std::expected<std::tuple<int, int>, std::string> parse_size(std::string_view siz
   return std::tuple{w, h};
 }
 
+std::expected<int, std::string> parse_int(std::string_view value, std::string_view option_name) {
+  int result{};
+  const auto [ptr, ec] = std::from_chars(value.data(), value.data() + value.size(), result);
+  if (ec == std::errc::result_out_of_range)
+    return std::unexpected(std::format("Value out of range for {}: '{}'", option_name, value));
+  if (ec != std::errc{} || ptr != value.data() + value.size())
+    return std::unexpected(std::format("Invalid integer value for {}: '{}'", option_name, value));
+  if (result < 0)
+    return std::unexpected(std::format("{} must not be negative: '{}'", option_name, value));
+  return result;
+}
+
 std::expected<std::vector<std::string>, std::string> resolve_input_files(const std::filesystem::path &source_dir,
                                                                          std::string_view files_str) {
   constexpr std::string_view k_valid_extension = ".png";
   std::vector<std::string> input_files;
   std::unordered_set<std::string> seen;
 
-  auto add_file = [&](const std::filesystem::path &p) {
+  auto add_file = [&seen, &input_files](const std::filesystem::path &p) {
     const std::string s{p.string()};
     if (seen.insert(s).second)
       input_files.push_back(s);
   };
 
-  auto ext_matches = [&](const std::filesystem::path &p) {
+  auto ext_matches = [&k_valid_extension](const std::filesystem::path &p) {
     auto ext = p.extension().string();
     std::ranges::transform(ext, ext.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     return ext == k_valid_extension;
@@ -169,4 +183,58 @@ std::expected<std::vector<std::string>, std::string> resolve_input_files(const s
                                        files_str.empty() ? "" : std::format(" matching '{}'", files_str)));
   }
   return input_files;
+}
+
+std::expected<void, std::string> validate_animation_naming(const std::vector<std::string> &files) {
+  // group key: "<unit>_<state>", facing -> set of frame indices present for that facing.
+  std::map<std::string, std::map<std::string, std::set<int>>> groups;
+
+  for (const auto &file : files) {
+    const std::string stem = std::filesystem::path(file).stem().string();
+    std::vector<std::string_view> tokens;
+    for (auto part : stem | std::views::split('_'))
+      tokens.emplace_back(part.begin(), part.end());
+    if (tokens.size() != 4)
+      continue;
+
+    int frame{};
+    const std::string_view frame_tok{tokens[3]};
+    const auto [ptr, ec] = std::from_chars(frame_tok.data(), frame_tok.data() + frame_tok.size(), frame);
+    if (ec != std::errc{} || ptr != frame_tok.data() + frame_tok.size())
+      continue;
+
+    const std::string group_key{std::format("{}_{}", tokens[0], tokens[1])};
+    const std::string facing{tokens[2]};
+    groups[group_key][facing].insert(frame);
+  }
+
+  std::vector<std::string> issues;
+  for (const auto &[group_key, facings] : groups) {
+    if (facings.size() < 2)
+      continue;
+
+    std::set<int> reference;
+    for (const auto &[facing, frames] : facings)
+      reference.insert(frames.begin(), frames.end());
+
+    for (const auto &[facing, frames] : facings) {
+      std::vector<int> missing;
+      std::ranges::set_difference(reference, frames, std::back_inserter(missing));
+      if (!missing.empty()) {
+        std::string missing_list;
+        for (std::size_t i = 0; i < missing.size(); ++i)
+          missing_list += (i == 0 ? "" : ", ") + std::to_string(missing[i]);
+        issues.push_back(std::format("{}: facing '{}' is missing frame(s) {} (present in other facings)", group_key,
+                                     facing, missing_list));
+      }
+    }
+  }
+
+  if (!issues.empty()) {
+    std::string message{"Animation validation failed:"};
+    for (const auto &issue : issues)
+      message += std::format("\n  {}", issue);
+    return std::unexpected(message);
+  }
+  return {};
 }

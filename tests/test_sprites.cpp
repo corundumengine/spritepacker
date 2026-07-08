@@ -127,9 +127,43 @@ TEST_SUITE("Sprite::load") {
     CHECK(img.is_valid());
   }
 
+  TEST_CASE("sets name to the file's stem") {
+    Sprite img;
+    auto result = img.load(TEST_FIXTURES_DIR "/sprite.png");
+    CHECK(result);
+    CHECK_EQ(img.name, "sprite");
+  }
+
   TEST_CASE("returns an error for a non-existent file") {
     Sprite img;
     auto result = img.load(TEST_FIXTURES_DIR "/nonexistent.png");
     CHECK_FALSE(result);
+  }
+}
+
+TEST_SUITE("compute_content_hash / trimmed_content_equal") {
+  TEST_CASE("identical trimmed content hashes equal and compares equal") {
+    const Sprite a = make_sprite(64, 64, 10, 10, 20, 20);
+    const Sprite b = make_sprite(64, 64, 10, 10, 20, 20);
+    const TrimRect ta = compute_trim(a);
+    const TrimRect tb = compute_trim(b);
+    CHECK_EQ(compute_content_hash(a, ta), compute_content_hash(b, tb));
+    CHECK(trimmed_content_equal(a, ta, b, tb));
+  }
+
+  TEST_CASE("same visible content at a different position within a larger canvas still matches") {
+    const Sprite a = make_sprite(64, 64, 10, 10, 20, 20);
+    const Sprite b = make_sprite(100, 100, 40, 40, 20, 20);
+    const TrimRect ta = compute_trim(a);
+    const TrimRect tb = compute_trim(b);
+    CHECK(trimmed_content_equal(a, ta, b, tb));
+  }
+
+  TEST_CASE("different content does not match") {
+    const Sprite a = make_sprite(64, 64, 10, 10, 20, 20);
+    const Sprite b = make_sprite(64, 64, 10, 10, 20, 10);
+    const TrimRect ta = compute_trim(a);
+    const TrimRect tb = compute_trim(b);
+    CHECK_FALSE(trimmed_content_equal(a, ta, b, tb));
   }
 }
