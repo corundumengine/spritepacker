@@ -2,6 +2,27 @@
 
 All notable changes to this project are documented here.
 
+## [0.3.0] — 2026-07-08
+
+### Added
+
+- **MaxRects bin-packing**: Replaced the fixed-grid layout with a MaxRects packer, so sprites of varying sizes are packed tightly by trimmed content rather than uniform cells. Sprites are packed largest-first for a tighter layout.
+- **Automatic trimming**: Every sprite is trimmed to its non-transparent bounding box before packing; the JSON metadata records each sprite's `trim_x`/`trim_y`/`source_width`/`source_height` so a renderer can restore its original position.
+- **`--padding` flag** (`-p <n>`): Pixel gap between packed sprites (default: `1`).
+- **`--pivot` flag**: Sprite anchor point preset — `bottom-center` (default), `center`, `top-center`, or `top-left`.
+- **`--pivot-manifest` flag**: JSON file of per-sprite pivot overrides, keyed by sprite name.
+- **`--pot` flag**: Rounds each sheet's final width/height up to the next power of two.
+- **`--validate-animations` flag**: Requires `<unit>_<state>_<facing>_<frame>.png` sets to have matching frame counts across all facings of the same animation; fails the build if not.
+- **Sprite deduplication**: Identical frames (by trimmed pixel content) reused across states are packed once; every referencing name in the exported metadata points at the single packed instance.
+- **Parallel sprite loading**: PNG decoding is now done concurrently across worker threads.
+- **`schema_version` field** in JSON metadata (currently `2`) to let consumers detect format changes.
+
+### Changed
+
+- **JSON metadata schema replaced**: `columns`/`rows`/`frame_width`/`frame_height`/`offset_*`/`spacing_*` are gone. Each sheet now has `width`/`height` and a `sprites` array of `{name, x, y, w, h, trim_x, trim_y, source_width, source_height, pivot_x, pivot_y}`.
+- **`--size` flag removed**: Frame size is no longer a concept — sprites keep their own trimmed dimensions instead of being placed into a uniform grid cell.
+- **Oversize sprites now fail the build** instead of only warning: a sprite (after trimming, plus padding) that exceeds `--max-size` is an error, not a silently-cropped warning.
+
 ## [0.2.1] — 2026-07-04
 
 ### Added
