@@ -28,8 +28,10 @@ struct Atlas {
  * (untrimmed) sprite's top-left corner to that trimmed content, and `source_width/source_height`
  * are the original sprite's dimensions — together these let an engine re-expand the sprite to its
  * authored bounding box. `pivot_x/pivot_y` are normalized (0..1) coordinates of the sprite's
- * anchor point within the trimmed box; an isometric engine typically uses pivot_y == 1 (the
- * sprite's "feet") as its depth-sort key, so no separate sort-hint field is needed.
+ * anchor point. By default they're relative to the trimmed box (y=0 top, y=1 bottom) so pivot_y == 1
+ * is the trimmed art's "feet" — a natural depth-sort key. With `--pivot full-canvas` they're
+ * relative to the full source canvas with y measured from the BOTTOM, preserving the source
+ * padding, and the atlas carries "pivot_basis": "full" so importers can tell the two apart.
  */
 struct PackedSprite {
   std::string name;
@@ -50,6 +52,9 @@ struct PackData {
   std::filesystem::path sheets_dir;
   std::filesystem::path assets_dir;
   std::string output_name;
+
+  bool full_canvas_pivot{false}; // when true, pivot_x/y are written as fractions of the full source
+                                 // canvas (y from bottom) and the atlas carries "pivot_basis": "full"
 
   std::vector<Sprite> unique_images;    // deduplicated sprite pixel data, one entry per unique visual
   std::vector<TrimRect> unique_trims;   // trim rect for unique_images[i], in that sprite's own coordinates

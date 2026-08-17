@@ -117,6 +117,86 @@ TEST_SUITE("parse_int") {
   }
 }
 
+TEST_SUITE("parse_double") {
+  TEST_CASE("parses a fractional value") {
+    auto result = parse_double("0.18", "--pivot");
+    CHECK(result);
+    CHECK_EQ(*result, doctest::Approx(0.18));
+  }
+
+  TEST_CASE("rejects non-numeric input") {
+    auto result = parse_double("abc", "--pivot");
+    CHECK_FALSE(result);
+    CHECK(result.error().find("Invalid number") != std::string::npos);
+  }
+
+  TEST_CASE("rejects trailing garbage") {
+    auto result = parse_double("0.5x", "--pivot");
+    CHECK_FALSE(result);
+    CHECK(result.error().find("Invalid number") != std::string::npos);
+  }
+
+  TEST_CASE("rejects empty input") {
+    auto result = parse_double("", "--pivot");
+    CHECK_FALSE(result);
+  }
+}
+
+TEST_SUITE("resolve_pivot") {
+  TEST_CASE("bottom-center is the default") {
+    auto result = resolve_pivot("bottom-center");
+    REQUIRE(result);
+    CHECK_EQ(result->x, doctest::Approx(0.5));
+    CHECK_EQ(result->y, doctest::Approx(1.0));
+    CHECK_FALSE(result->full_canvas);
+  }
+
+  TEST_CASE("center preset") {
+    auto result = resolve_pivot("center");
+    REQUIRE(result);
+    CHECK_EQ(result->x, doctest::Approx(0.5));
+    CHECK_EQ(result->y, doctest::Approx(0.5));
+    CHECK_FALSE(result->full_canvas);
+  }
+
+  TEST_CASE("full-canvas without a value is bottom-center of the full canvas") {
+    auto result = resolve_pivot("full-canvas");
+    REQUIRE(result);
+    CHECK_EQ(result->x, doctest::Approx(0.5));
+    CHECK_EQ(result->y, doctest::Approx(0.0));
+    CHECK(result->full_canvas);
+  }
+
+  TEST_CASE("full-canvas single value sets y") {
+    auto result = resolve_pivot("full-canvas:0.18");
+    REQUIRE(result);
+    CHECK_EQ(result->x, doctest::Approx(0.5));
+    CHECK_EQ(result->y, doctest::Approx(0.18));
+    CHECK(result->full_canvas);
+  }
+
+  TEST_CASE("full-canvas x,y value sets both") {
+    auto result = resolve_pivot("full-canvas:0.5,0.18");
+    REQUIRE(result);
+    CHECK_EQ(result->x, doctest::Approx(0.5));
+    CHECK_EQ(result->y, doctest::Approx(0.18));
+    CHECK(result->full_canvas);
+  }
+
+  TEST_CASE("unknown preset is rejected") {
+    auto result = resolve_pivot("bogus");
+    CHECK_FALSE(result);
+    CHECK(result.error().find("Invalid --pivot value") != std::string::npos);
+  }
+
+  TEST_CASE("non-numeric full-canvas suffix is rejected") {
+    for (const std::string_view preset : {"full-canvas:", "full-canvas:abc", "full-canvas:0.5,abc", "full-canvas:,0.18"}) {
+      CAPTURE(preset);
+      CHECK_FALSE(resolve_pivot(preset));
+    }
+  }
+}
+
 TEST_SUITE("validate_animation_naming") {
   TEST_CASE("passes when all facings of an animation share the same frame set") {
     const std::vector<std::string> files{

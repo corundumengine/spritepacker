@@ -21,8 +21,10 @@ Options:
   --files,      -f <list>  Comma-separated filenames or wildcard patterns (default: *.png)
   --max-size,   -m WxH     Maximum atlas size per sheet (default: 2048x2048)
   --padding,    -p <n>     Pixel gap between packed sprites (default: 1)
-  --pivot       <preset>   Sprite anchor point: bottom-center (default), center, top-center, top-left
-  --pivot-manifest <file>  JSON file of per-sprite pivot overrides: {{"name": {{"x":0.5,"y":1.0}}, ...}}
+  --pivot       <preset>   Sprite anchor point. Presets anchor the trimmed art: bottom-center
+                           (default), center, top-center, top-left. "full-canvas" anchors the FULL
+                           source canvas (y from bottom), preserving source padding, and takes an
+                           optional value: full-canvas, full-canvas:0.18, full-canvas:0.5,0.18
   --validate-animations    Require <unit>_<state>_<facing>_<frame>.png sets to have matching frames
                             across all facings of the same animation; fails the build if not
   --pot                    Round each sheet's final width/height up to the next power of two

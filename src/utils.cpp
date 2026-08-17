@@ -110,6 +110,69 @@ std::expected<int, std::string> parse_int(std::string_view value, std::string_vi
   return result;
 }
 
+std::expected<double, std::string> parse_double(std::string_view value, std::string_view option_name) {
+  double result{};
+  const auto [ptr, ec] = std::from_chars(value.data(), value.data() + value.size(), result);
+  if (ec == std::errc::result_out_of_range)
+    return std::unexpected(std::format("Value out of range for {}: '{}'", option_name, value));
+  if (ec != std::errc{} || ptr != value.data() + value.size())
+    return std::unexpected(std::format("Invalid number for {}: '{}'", option_name, value));
+  return result;
+}
+
+namespace {
+  constexpr std::string_view k_full_canvas{"full-canvas"};
+  constexpr double k_half{0.5};
+
+  std::string invalid_pivot_message(std::string_view preset) {
+    return std::format(
+        "Invalid --pivot value '{}'. Use a preset (bottom-center, center, top-center, top-left) or "
+        "full-canvas with an optional value (full-canvas, full-canvas:0.18, full-canvas:0.5,0.18)",
+        preset);
+  }
+} // namespace
+
+std::expected<Pivot, std::string> resolve_pivot(std::string_view preset) {
+  if (preset == "bottom-center")
+    return Pivot{k_half, 1.0, false};
+  if (preset == "center")
+    return Pivot{k_half, k_half, false};
+  if (preset == "top-center")
+    return Pivot{k_half, 0.0, false};
+  if (preset == "top-left")
+    return Pivot{0.0, 0.0, false};
+
+  if (preset.starts_with(k_full_canvas)) {
+    if (preset == k_full_canvas)
+      return Pivot{k_half, 0.0, true}; // full-canvas bottom-center
+
+    const std::string_view suffix{preset.substr(k_full_canvas.size())};
+    if (!suffix.starts_with(':'))
+      return std::unexpected(invalid_pivot_message(preset));
+    const std::string_view value{suffix.substr(1)};
+
+    double px{k_half}, py{0.0};
+    if (const auto comma = value.find(','); comma != std::string_view::npos) {
+      auto x = parse_double(value.substr(0, comma), "--pivot");
+      if (!x)
+        return std::unexpected(x.error());
+      auto y = parse_double(value.substr(comma + 1), "--pivot");
+      if (!y)
+        return std::unexpected(y.error());
+      px = *x;
+      py = *y;
+    } else {
+      auto y = parse_double(value, "--pivot");
+      if (!y)
+        return std::unexpected(y.error());
+      py = *y;
+    }
+    return Pivot{px, py, true};
+  }
+
+  return std::unexpected(invalid_pivot_message(preset));
+}
+
 std::expected<std::vector<std::string>, std::string> resolve_input_files(const std::filesystem::path &source_dir,
                                                                          std::string_view files_str) {
   constexpr std::string_view k_valid_extension = ".png";

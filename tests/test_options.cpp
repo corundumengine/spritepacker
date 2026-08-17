@@ -94,4 +94,29 @@ TEST_SUITE("Options::validate") {
     CHECK_FALSE(result);
     CHECK(result.error().find("Invalid --pivot value") != std::string::npos);
   }
+
+  TEST_CASE("full-canvas pivot presets with value suffixes are valid") {
+    Options opts;
+    opts.input = "/src";
+    opts.sheets = "/out";
+    opts.name = "atlas";
+    for (const std::string pivot : {"full-canvas", "full-canvas:0.18", "full-canvas:0.5,0.18"}) {
+      opts.pivot = pivot;
+      CAPTURE(pivot);
+      CHECK(opts.validate());
+    }
+  }
+
+  TEST_CASE("full-canvas value suffix without a valid number is rejected") {
+    Options opts;
+    opts.input = "/src";
+    opts.sheets = "/out";
+    opts.name = "atlas";
+    for (const std::string_view pivot : {"full-canvas:", "full-canvas:abc", "full-canvas:0.5,abc", "full-canvas:,0.18"}) {
+      opts.pivot = pivot;
+      CAPTURE(pivot);
+      auto result = opts.validate();
+      CHECK_FALSE(result);
+    }
+  }
 }

@@ -79,17 +79,6 @@ TEST_SUITE("PackData::from_options") {
     CHECK_FALSE(result);
     CHECK(result.error().find("exceeds --max-size") != std::string::npos);
   }
-
-  TEST_CASE("nonexistent pivot manifest file is rejected") {
-    Options opts;
-    opts.input = TEST_FIXTURES_DIR;
-    opts.sheets = ".";
-    opts.name = "test";
-    opts.pivot_manifest = "/nonexistent/pivots.json";
-    auto result = PackData::from_options(opts);
-    CHECK_FALSE(result);
-    CHECK(result.error().find("--pivot-manifest") != std::string::npos);
-  }
 }
 
 namespace {

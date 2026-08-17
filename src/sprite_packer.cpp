@@ -81,40 +81,6 @@ namespace {
     return images;
   }
 
-  std::pair<double, double> pivot_for_preset(std::string_view preset) noexcept {
-    if (preset == "center")
-      return {0.5, 0.5};
-    if (preset == "top-center")
-      return {0.5, 0.0};
-    if (preset == "top-left")
-      return {0.0, 0.0};
-    return {0.5, 1.0}; // bottom-center — the sprite's "feet", the common isometric depth-sort anchor
-  }
-
-  std::expected<std::unordered_map<std::string, std::pair<double, double>>, std::string>
-  load_pivot_manifest(const fs::path &path) {
-    std::ifstream file(path);
-    if (!file)
-      return std::unexpected(std::format("Could not open --pivot-manifest file: {}", path.string()));
-
-    json parsed;
-    try {
-      file >> parsed;
-    } catch (const json::parse_error &e) {
-      return std::unexpected(std::format("Invalid JSON in --pivot-manifest '{}': {}", path.string(), e.what()));
-    }
-    if (!parsed.is_object())
-      return std::unexpected(std::format("--pivot-manifest '{}' must be a JSON object", path.string()));
-
-    std::unordered_map<std::string, std::pair<double, double>> overrides;
-    for (const auto &[name, value] : parsed.items()) {
-      if (!value.is_object() || !value.contains("x") || !value.contains("y"))
-        return std::unexpected(std::format("--pivot-manifest entry '{}' must be an object with \"x\" and \"y\"", name));
-      overrides[name] = {value.at("x").get<double>(), value.at("y").get<double>()};
-    }
-    return overrides;
-  }
-
   int next_power_of_two(int v) noexcept {
     if (v <= 0)
       return 1;
@@ -165,14 +131,6 @@ std::expected<PackData, std::string> PackData::from_options(const Options &optio
   if (!padding_result)
     return std::unexpected(padding_result.error());
   const int padding{*padding_result};
-
-  std::unordered_map<std::string, std::pair<double, double>> pivot_overrides;
-  if (!options.pivot_manifest.empty()) {
-    auto manifest = load_pivot_manifest(fs::path{options.pivot_manifest});
-    if (!manifest)
-      return std::unexpected(manifest.error());
-    pivot_overrides = std::move(*manifest);
-  }
 
   auto input_files = resolve_input_files(source_dir, options.files);
   if (!input_files)
@@ -291,7 +249,9 @@ std::expected<PackData, std::string> PackData::from_options(const Options &optio
     sheet_sizes.emplace_back(sw, sh);
   }
 
-  const auto [pivot_x, pivot_y] = pivot_for_preset(options.pivot);
+  const auto pivot = resolve_pivot(options.pivot);
+  if (!pivot)
+    return std::unexpected(pivot.error());
 
   std::vector<PackedSprite> sprites;
   sprites.reserve(images->size());
@@ -300,12 +260,6 @@ std::expected<PackData, std::string> PackData::from_options(const Options &optio
     const auto &placement = placements[static_cast<std::size_t>(uidx)];
     const auto &unique_sprite = unique_images[static_cast<std::size_t>(uidx)];
     const auto &unique_trim = unique_trims[static_cast<std::size_t>(uidx)];
-
-    double px{pivot_x}, py{pivot_y};
-    if (auto it = pivot_overrides.find(names[i]); it != pivot_overrides.end()) {
-      px = it->second.first;
-      py = it->second.second;
-    }
 
     sprites.push_back(PackedSprite{
         .name = names[i],
@@ -318,8 +272,8 @@ std::expected<PackData, std::string> PackData::from_options(const Options &optio
         .trim_y = unique_trim.y,
         .source_width = unique_sprite.width,
         .source_height = unique_sprite.height,
-        .pivot_x = px,
-        .pivot_y = py,
+        .pivot_x = pivot->x,
+        .pivot_y = pivot->y,
     });
   }
 
@@ -332,6 +286,7 @@ std::expected<PackData, std::string> PackData::from_options(const Options &optio
       .sheets_dir = sheets_dir,
       .assets_dir = std::move(assets_dir),
       .output_name = options.name,
+      .full_canvas_pivot = pivot->full_canvas,
       .unique_images = std::move(unique_images),
       .unique_trims = std::move(unique_trims),
       .sprites = std::move(sprites),
@@ -394,6 +349,8 @@ std::expected<void, std::string> PackData::write_metadata() const {
     metadata["path"] = png_path.string();
     metadata["width"] = atlas_w;
     metadata["height"] = atlas_h;
+    if (full_canvas_pivot)
+      metadata["pivot_basis"] = "full"; // pivots are fractions of the full source canvas, y from the bottom
 
     json sprite_array = json::array();
     for (const auto &sprite : sprites) {

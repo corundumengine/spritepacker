@@ -2,6 +2,21 @@
 
 All notable changes to this project are documented here.
 
+## [0.4.0] — 2026-08-16
+
+### Added
+
+- **`full-canvas` pivot mode**: `--pivot full-canvas` anchors the sprite on its FULL source canvas (y measured from the bottom), preserving authored padding where tilemap alignment often lives — instead of always anchoring the trimmed art. Takes an optional value suffix so you don't have to hand-edit every sprite afterwards: `full-canvas`, `full-canvas:0.18` (sets y), or `full-canvas:0.5,0.18` (sets x and y).
+- **`pivot_basis` metadata field**: When built with `--pivot full-canvas`, each sheet's JSON carries `"pivot_basis": "full"` so importers can tell full-canvas pivots (y from the bottom) apart from the default trimmed-box pivots (y from the top).
+
+### Removed
+
+- **`--pivot-manifest` flag**: Removed per-sprite pivot overrides from a JSON file. `--pivot full-canvas` with its optional `:Y` / `:X,Y` suffix covers the same use case (anchoring on the source canvas rather than the trimmed art) without a separate file.
+
+### Changed
+
+- **Pivot parsing is now validated and centralized**: `--pivot` values are fully parsed by `resolve_pivot`, which reports errors for malformed `full-canvas` suffixes (e.g. `full-canvas:abc`) instead of silently defaulting to a wrong pivot. Pivot coordinates and their basis are carried as a single `Pivot` type shared by option validation and packing.
+
 ## [0.3.0] — 2026-07-08
 
 ### Added

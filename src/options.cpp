@@ -1,7 +1,6 @@
 #include "options.hpp"
+#include "utils.hpp"
 
-#include <algorithm>
-#include <array>
 #include <format>
 #include <ranges>
 #include <span>
@@ -26,12 +25,9 @@ namespace {
       {"--max-size", "-m", true, [](Options &o, std::string_view v) { o.max_size = v; }},
       {"--padding", "-p", true, [](Options &o, std::string_view v) { o.padding = v; }},
       {"--pivot", "", true, [](Options &o, std::string_view v) { o.pivot = v; }},
-      {"--pivot-manifest", "", true, [](Options &o, std::string_view v) { o.pivot_manifest = v; }},
       {"--validate-animations", "", false, [](Options &o, std::string_view) { o.validate_animations = true; }},
       {"--pot", "", false, [](Options &o, std::string_view) { o.pot = true; }},
   };
-
-  constexpr std::array<std::string_view, 4> k_pivot_presets{"bottom-center", "center", "top-center", "top-left"};
 } // namespace
 
 std::expected<void, std::string> Options::validate() const {
@@ -41,9 +37,8 @@ std::expected<void, std::string> Options::validate() const {
     return std::unexpected("Missing required argument: --sheets");
   if (name.empty())
     return std::unexpected("Missing required argument: --name");
-  if (std::ranges::find(k_pivot_presets, pivot) == k_pivot_presets.end())
-    return std::unexpected(
-        std::format("Invalid --pivot value '{}'. Use one of: bottom-center, center, top-center, top-left", pivot));
+  if (auto result = resolve_pivot(pivot); !result)
+    return std::unexpected(result.error());
   return {};
 }
 

@@ -13,8 +13,8 @@ struct Options {
   std::string name;                   // base name for output files, e.g. "terrain" → terrain.png, terrain.json
   std::string max_size;               // optional maximum atlas size in "WxH" format
   std::string padding;                // optional pixel gap between packed sprites (default: "1")
-  std::string pivot{"bottom-center"}; // preset: bottom-center, center, top-center, top-left
-  std::string pivot_manifest;         // optional path to a JSON file of per-sprite pivot overrides
+  std::string pivot{"bottom-center"}; // preset: bottom-center, center, top-center, top-left, or
+                                      // full-canvas[:Y] / full-canvas:X,Y (y from bottom)
   bool validate_animations{false};    // if set, enforce <unit>_<state>_<facing>_<frame>.png completeness
   bool pot{false};                    // round each sheet's final dimensions up to the next power of two
   bool show_help{false};
