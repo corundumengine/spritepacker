@@ -4,11 +4,13 @@
 #include "options.hpp"
 #include <doctest/doctest.h>
 
+#include <span>
+
 TEST_SUITE("Options::parse_args") {
   TEST_CASE("parses valid options") {
     const char *argv[] = {"prog",       "--input",    "/src",      "--sheets",  "/out", "--name",  "atlas", "--files",
                           "chest*.png", "--max-size", "1024x1024", "--padding", "2",    "--pivot", "center"};
-    auto result = Options::parse_args(std::size(argv), const_cast<char **>(argv));
+    auto result = Options::parse_args(std::span<char *>(const_cast<char **>(argv), std::size(argv)));
     CHECK(result);
     CHECK_EQ(result->input, "/src");
     CHECK_EQ(result->sheets, "/out");
@@ -22,7 +24,7 @@ TEST_SUITE("Options::parse_args") {
   TEST_CASE("parses boolean flags") {
     const char *argv[] = {"prog", "--input", "/src", "--sheets", "/out", "--name", "atlas", "--validate-animations",
                           "--pot"};
-    auto result = Options::parse_args(std::size(argv), const_cast<char **>(argv));
+    auto result = Options::parse_args(std::span<char *>(const_cast<char **>(argv), std::size(argv)));
     CHECK(result);
     CHECK(result->validate_animations);
     CHECK(result->pot);
@@ -30,14 +32,14 @@ TEST_SUITE("Options::parse_args") {
 
   TEST_CASE("returns an error with invalid arguments") {
     const char *argv[] = {"prog", "--input", ".", "--sheets", ".", "--name", "test", "--foo", "bar"};
-    auto result = Options::parse_args(std::size(argv), const_cast<char **>(argv));
+    auto result = Options::parse_args(std::span<char *>(const_cast<char **>(argv), std::size(argv)));
     CHECK_FALSE(result);
     CHECK(result.error().find("Unknown argument '--foo'") != std::string::npos);
   }
 
   TEST_CASE("rejects flag where value is expected") {
     const char *argv[] = {"prog", "--input", "-h"};
-    auto result = Options::parse_args(std::size(argv), const_cast<char **>(argv));
+    auto result = Options::parse_args(std::span<char *>(const_cast<char **>(argv), std::size(argv)));
     CHECK_FALSE(result);
     CHECK(result.error().find("Unexpected flag") != std::string::npos);
   }

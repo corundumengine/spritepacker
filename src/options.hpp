@@ -5,6 +5,7 @@
 #define OPTIONS_HPP
 
 #include <expected>
+#include <span>
 #include <string>
 
 /** Raw CLI arguments parsed directly from argv, before validation or type conversion. */
@@ -31,7 +32,7 @@ struct Options {
    * with show_help set when --help/-h is passed or no arguments are provided.
    * Returns an error for unknown arguments or missing required fields.
    */
-  [[nodiscard]] static std::expected<Options, std::string> parse_args(int argc, char *argv[]);
+  [[nodiscard]] static std::expected<Options, std::string> parse_args(std::span<char *> argv);
 };
 
 #endif // OPTIONS_HPP

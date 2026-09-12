@@ -118,7 +118,7 @@ int main(int argc, char *argv[]) {
     return EXIT_FAILURE;
   }
 
-  auto options = Options::parse_args(argc, argv);
+  auto options = Options::parse_args(std::span<char *>(argv, static_cast<std::size_t>(argc)));
   if (!options) {
     std::println(stderr, "error: {}", options.error());
     return EXIT_FAILURE;
