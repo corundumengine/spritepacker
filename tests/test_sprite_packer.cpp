@@ -102,10 +102,11 @@ namespace {
     s.name = std::move(name);
     s.width = w;
     s.height = h;
-    s.data.assign(static_cast<std::size_t>(w * h * 4), 0);
+    s.data.assign(static_cast<std::size_t>(w) * static_cast<std::size_t>(h) * 4, 0);
     for (int y = oy; y < oy + oh; ++y) {
       for (int x = ox; x < ox + ow; ++x) {
-        const auto idx = static_cast<std::size_t>((y * w + x) * 4);
+        const auto row = static_cast<std::size_t>(y) * static_cast<std::size_t>(w);
+        const auto idx = (row + static_cast<std::size_t>(x)) * 4;
         s.data[idx + 3] = 255; // opaque
       }
     }
@@ -142,26 +143,32 @@ namespace {
     // Lay unique sprites out left to right with no overlap, sized to fit exactly.
     int x{0};
     int max_h{0};
-    for (std::size_t i = 0; i < data.sprites.size(); ++i) {
-      data.sprites[i].x = x;
-      data.sprites[i].y = 0;
-      x += data.sprites[i].w;
-      max_h = std::max(max_h, data.sprites[i].h);
+    for (auto &sprite : data.sprites) {
+      sprite.x = x;
+      sprite.y = 0;
+      x += sprite.w;
+      max_h = std::max(max_h, sprite.h);
     }
     data.sheet_sizes.emplace_back(std::max(1, x), std::max(1, max_h));
     data.num_sheets = 1;
     return data;
   }
 
+  void check_every_pixel_opaque(const Sprite &sprite) {
+    for (std::size_t i = 3; i < sprite.data.size(); i += 4) {
+      CHECK_EQ(sprite.data[i], 255);
+    }
+  }
+
 } // namespace
 
 TEST_SUITE("write_metadata") {
-  using json = nlohmann::json;
+  using nlohmann::json;
 
   TEST_CASE("writes schema_version, sheet dimensions, and per-sprite placement/trim/pivot fields") {
     PackData data = build_pack_data({make_sprite("hero_idle_0", 64, 64, 16, 32, 20, 32)});
 
-    std::filesystem::path dir = std::filesystem::temp_directory_path() / "spritepacker_test_meta";
+    const std::filesystem::path dir = std::filesystem::temp_directory_path() / "spritepacker_test_meta";
     std::filesystem::create_directories(dir);
     data.sheets_dir = dir;
 
@@ -200,7 +207,7 @@ TEST_SUITE("write_metadata") {
     data.sheet_sizes.emplace_back(32, 32);
     data.num_sheets = 2;
 
-    std::filesystem::path dir = std::filesystem::temp_directory_path() / "spritepacker_test_meta_multi";
+    const std::filesystem::path dir = std::filesystem::temp_directory_path() / "spritepacker_test_meta_multi";
     std::filesystem::create_directories(dir);
     data.sheets_dir = dir;
     data.assets_dir = dir;
@@ -229,7 +236,7 @@ TEST_SUITE("PackData::pack") {
   TEST_CASE("blits only the trimmed content of each sprite at its packed position") {
     PackData data = build_pack_data({make_sprite("hero", 64, 64, 16, 32, 20, 32)});
 
-    std::filesystem::path dir = std::filesystem::temp_directory_path() / "spritepacker_test_pack";
+    const std::filesystem::path dir = std::filesystem::temp_directory_path() / "spritepacker_test_pack";
     std::filesystem::create_directories(dir);
     data.sheets_dir = dir;
     data.assets_dir = dir;
@@ -242,8 +249,7 @@ TEST_SUITE("PackData::pack") {
     CHECK_EQ(loaded.width, 20);
     CHECK_EQ(loaded.height, 32);
     // Every pixel of the packed sheet should be opaque, since the whole trimmed region was opaque.
-    for (std::size_t i = 3; i < loaded.data.size(); i += 4)
-      CHECK_EQ(loaded.data[i], 255);
+    check_every_pixel_opaque(loaded);
 
     std::error_code ec;
     std::filesystem::remove_all(dir, ec);

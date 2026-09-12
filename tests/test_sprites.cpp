@@ -16,7 +16,7 @@ TEST_SUITE("Sprite::is_valid") {
 
   TEST_CASE("large image is valid") {
     Sprite img;
-    img.data.resize(1024 * 1024 * 4);
+    img.data.resize(static_cast<std::size_t>(1024) * 1024 * 4);
     img.width = 1024;
     img.height = 1024;
     CHECK(img.is_valid());
@@ -54,7 +54,7 @@ TEST_SUITE("Sprite::is_valid") {
   }
 
   TEST_CASE("all zeros is invalid") {
-    Sprite img;
+    const Sprite img;
     CHECK_FALSE(img.is_valid());
   }
 }
@@ -67,10 +67,11 @@ namespace {
     Sprite s;
     s.width = w;
     s.height = h;
-    s.data.assign(static_cast<std::size_t>(w * h * 4), 0);
+    s.data.assign(static_cast<std::size_t>(w) * static_cast<std::size_t>(h) * 4, 0);
     for (int y = oy; y < oy + oh; ++y) {
       for (int x = ox; x < ox + ow; ++x) {
-        const auto idx = static_cast<std::size_t>((y * w + x) * 4);
+        const auto row = static_cast<std::size_t>(y) * static_cast<std::size_t>(w);
+        const auto idx = (row + static_cast<std::size_t>(x)) * 4;
         s.data[idx + 0] = 255;
         s.data[idx + 1] = 255;
         s.data[idx + 2] = 255;
@@ -126,21 +127,21 @@ TEST_SUITE("compute_trim") {
 TEST_SUITE("Sprite::load") {
   TEST_CASE("loads a valid PNG") {
     Sprite img;
-    auto result = img.load(TEST_FIXTURES_DIR "/sprite.png");
+    const auto result = img.load(TEST_FIXTURES_DIR "/sprite.png");
     CHECK(result);
     CHECK(img.is_valid());
   }
 
   TEST_CASE("sets name to the file's stem") {
     Sprite img;
-    auto result = img.load(TEST_FIXTURES_DIR "/sprite.png");
+    const auto result = img.load(TEST_FIXTURES_DIR "/sprite.png");
     CHECK(result);
     CHECK_EQ(img.name, "sprite");
   }
 
   TEST_CASE("returns an error for a non-existent file") {
     Sprite img;
-    auto result = img.load(TEST_FIXTURES_DIR "/nonexistent.png");
+    const auto result = img.load(TEST_FIXTURES_DIR "/nonexistent.png");
     CHECK_FALSE(result);
   }
 }

@@ -4,6 +4,7 @@
 #include "rect_packer.hpp"
 #include <doctest/doctest.h>
 
+#include <optional>
 #include <utility>
 #include <vector>
 
@@ -11,17 +12,30 @@ namespace {
   bool rects_overlap(const PackedRect &a, const PackedRect &b) {
     return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
   }
+
+  PackedRect require_rect(const std::optional<PackedRect> &rect) {
+    REQUIRE(rect.has_value());
+    if (!rect) {
+      return {};
+    }
+    return *rect;
+  }
+
+  void check_no_overlaps(const PackedRect &rect, const std::vector<PackedRect> &placed) {
+    for (const auto &other : placed) {
+      CHECK_FALSE(rects_overlap(rect, other));
+    }
+  }
 } // namespace
 
 TEST_SUITE("MaxRectsPacker") {
   TEST_CASE("places a single rect at the origin") {
     MaxRectsPacker packer(256, 256);
-    const auto rect = packer.insert(64, 32);
-    REQUIRE(rect);
-    CHECK_EQ(rect->x, 0);
-    CHECK_EQ(rect->y, 0);
-    CHECK_EQ(rect->w, 64);
-    CHECK_EQ(rect->h, 32);
+    const auto rect = require_rect(packer.insert(64, 32));
+    CHECK_EQ(rect.x, 0);
+    CHECK_EQ(rect.y, 0);
+    CHECK_EQ(rect.w, 64);
+    CHECK_EQ(rect.h, 32);
   }
 
   TEST_CASE("rejects a rect larger than the bin in either dimension") {
@@ -41,11 +55,9 @@ TEST_SUITE("MaxRectsPacker") {
     MaxRectsPacker packer(64, 64);
     std::vector<PackedRect> placed;
     for (int i = 0; i < 16; ++i) {
-      const auto rect = packer.insert(16, 16);
-      REQUIRE(rect);
-      for (const auto &other : placed)
-        CHECK_FALSE(rects_overlap(*rect, other));
-      placed.push_back(*rect);
+      const auto rect = require_rect(packer.insert(16, 16));
+      check_no_overlaps(rect, placed);
+      placed.push_back(rect);
     }
     // The bin is exactly full now; a 17th same-size rect must fail.
     CHECK_FALSE(packer.insert(16, 16));
@@ -56,13 +68,11 @@ TEST_SUITE("MaxRectsPacker") {
     const std::vector<std::pair<int, int>> sizes{{100, 40}, {30, 30}, {70, 90}, {10, 10}, {50, 50}, {1, 1}};
     std::vector<PackedRect> placed;
     for (const auto &[w, h] : sizes) {
-      const auto rect = packer.insert(w, h);
-      REQUIRE(rect);
-      CHECK_EQ(rect->w, w);
-      CHECK_EQ(rect->h, h);
-      for (const auto &other : placed)
-        CHECK_FALSE(rects_overlap(*rect, other));
-      placed.push_back(*rect);
+      const auto rect = require_rect(packer.insert(w, h));
+      CHECK_EQ(rect.w, w);
+      CHECK_EQ(rect.h, h);
+      check_no_overlaps(rect, placed);
+      placed.push_back(rect);
     }
   }
 
@@ -74,9 +84,8 @@ TEST_SUITE("MaxRectsPacker") {
 
   TEST_CASE("a single sprite exactly filling the bin succeeds") {
     MaxRectsPacker packer(128, 96);
-    const auto rect = packer.insert(128, 96);
-    REQUIRE(rect);
-    CHECK_EQ(rect->x, 0);
-    CHECK_EQ(rect->y, 0);
+    const auto rect = require_rect(packer.insert(128, 96));
+    CHECK_EQ(rect.x, 0);
+    CHECK_EQ(rect.y, 0);
   }
 }

@@ -13,7 +13,7 @@ namespace fs = std::filesystem;
 
 TEST_SUITE("parse_size") {
   TEST_CASE("identical width and height") {
-    auto result = parse_size("64x64");
+    const auto result = parse_size("64x64");
     CHECK(result);
     auto [w, h] = *result;
     CHECK_EQ(w, 64);
@@ -21,7 +21,7 @@ TEST_SUITE("parse_size") {
   }
 
   TEST_CASE("different sizes") {
-    auto result = parse_size("128x32");
+    const auto result = parse_size("128x32");
     CHECK(result);
     auto [w, h] = *result;
     CHECK_EQ(w, 128);
@@ -29,7 +29,7 @@ TEST_SUITE("parse_size") {
   }
 
   TEST_CASE("large numbers") {
-    auto result = parse_size("4096x2048");
+    const auto result = parse_size("4096x2048");
     CHECK(result);
     auto [w, h] = *result;
     CHECK_EQ(w, 4096);
@@ -37,55 +37,55 @@ TEST_SUITE("parse_size") {
   }
 
   TEST_CASE("missing delimiter is invalid") {
-    auto result = parse_size("64");
+    const auto result = parse_size("64");
     CHECK_FALSE(result);
     CHECK(result.error().find("Invalid size format") != std::string::npos);
   }
 
   TEST_CASE("non-numeric is invalid") {
-    auto result = parse_size("axb");
+    const auto result = parse_size("axb");
     CHECK_FALSE(result);
     CHECK(result.error().find("Invalid size format") != std::string::npos);
   }
 
   TEST_CASE("zero width is invalid") {
-    auto result = parse_size("0x64");
+    const auto result = parse_size("0x64");
     CHECK_FALSE(result);
     CHECK(result.error().find("must be positive") != std::string::npos);
   }
 
   TEST_CASE("zero height is invalid") {
-    auto result = parse_size("64x0");
+    const auto result = parse_size("64x0");
     CHECK_FALSE(result);
     CHECK(result.error().find("must be positive") != std::string::npos);
   }
 
   TEST_CASE("negative width is invalid") {
-    auto result = parse_size("-1x64");
+    const auto result = parse_size("-1x64");
     CHECK_FALSE(result);
     CHECK(result.error().find("must be positive") != std::string::npos);
   }
 
   TEST_CASE("number out of range is invalid") {
-    auto result = parse_size("999999999999x64");
+    const auto result = parse_size("999999999999x64");
     CHECK_FALSE(result);
     CHECK(result.error().find("out of range") != std::string::npos);
   }
 
   TEST_CASE("trailing characters after height is invalid") {
-    auto result = parse_size("64x32trailing");
+    const auto result = parse_size("64x32trailing");
     CHECK_FALSE(result);
     CHECK(result.error().find("Invalid size format") != std::string::npos);
   }
 
   TEST_CASE("garbage between width and delimiter is invalid") {
-    auto result = parse_size("64abcx32");
+    const auto result = parse_size("64abcx32");
     CHECK_FALSE(result);
     CHECK(result.error().find("Invalid size format") != std::string::npos);
   }
 
   TEST_CASE("missing width is invalid") {
-    auto result = parse_size("x32");
+    const auto result = parse_size("x32");
     CHECK_FALSE(result);
     CHECK(result.error().find("Invalid size format") != std::string::npos);
   }
@@ -93,31 +93,31 @@ TEST_SUITE("parse_size") {
 
 TEST_SUITE("parse_int") {
   TEST_CASE("parses a positive integer") {
-    auto result = parse_int("2", "--padding");
+    const auto result = parse_int("2", "--padding");
     CHECK(result);
     CHECK_EQ(*result, 2);
   }
 
   TEST_CASE("parses zero") {
-    auto result = parse_int("0", "--padding");
+    const auto result = parse_int("0", "--padding");
     CHECK(result);
     CHECK_EQ(*result, 0);
   }
 
   TEST_CASE("rejects a negative value") {
-    auto result = parse_int("-1", "--padding");
+    const auto result = parse_int("-1", "--padding");
     CHECK_FALSE(result);
     CHECK(result.error().find("must not be negative") != std::string::npos);
   }
 
   TEST_CASE("rejects non-numeric input") {
-    auto result = parse_int("abc", "--padding");
+    const auto result = parse_int("abc", "--padding");
     CHECK_FALSE(result);
     CHECK(result.error().find("Invalid integer") != std::string::npos);
   }
 
   TEST_CASE("rejects trailing garbage") {
-    auto result = parse_int("2px", "--padding");
+    const auto result = parse_int("2px", "--padding");
     CHECK_FALSE(result);
     CHECK(result.error().find("Invalid integer") != std::string::npos);
   }
@@ -125,32 +125,32 @@ TEST_SUITE("parse_int") {
 
 TEST_SUITE("parse_double") {
   TEST_CASE("parses a fractional value") {
-    auto result = parse_double("0.18", "--pivot");
+    const auto result = parse_double("0.18", "--pivot");
     CHECK(result);
     CHECK_EQ(*result, doctest::Approx(0.18));
   }
 
   TEST_CASE("rejects non-numeric input") {
-    auto result = parse_double("abc", "--pivot");
+    const auto result = parse_double("abc", "--pivot");
     CHECK_FALSE(result);
     CHECK(result.error().find("Invalid number") != std::string::npos);
   }
 
   TEST_CASE("rejects trailing garbage") {
-    auto result = parse_double("0.5x", "--pivot");
+    const auto result = parse_double("0.5x", "--pivot");
     CHECK_FALSE(result);
     CHECK(result.error().find("Invalid number") != std::string::npos);
   }
 
   TEST_CASE("rejects empty input") {
-    auto result = parse_double("", "--pivot");
+    const auto result = parse_double("", "--pivot");
     CHECK_FALSE(result);
   }
 }
 
 TEST_SUITE("resolve_pivot") {
   TEST_CASE("bottom-center is the default") {
-    auto result = resolve_pivot("bottom-center");
+    const auto result = resolve_pivot("bottom-center");
     REQUIRE(result);
     CHECK_EQ(result->x, doctest::Approx(0.5));
     CHECK_EQ(result->y, doctest::Approx(1.0));
@@ -158,7 +158,7 @@ TEST_SUITE("resolve_pivot") {
   }
 
   TEST_CASE("center preset") {
-    auto result = resolve_pivot("center");
+    const auto result = resolve_pivot("center");
     REQUIRE(result);
     CHECK_EQ(result->x, doctest::Approx(0.5));
     CHECK_EQ(result->y, doctest::Approx(0.5));
@@ -166,7 +166,7 @@ TEST_SUITE("resolve_pivot") {
   }
 
   TEST_CASE("full-canvas without a value is bottom-center of the full canvas") {
-    auto result = resolve_pivot("full-canvas");
+    const auto result = resolve_pivot("full-canvas");
     REQUIRE(result);
     CHECK_EQ(result->x, doctest::Approx(0.5));
     CHECK_EQ(result->y, doctest::Approx(0.0));
@@ -174,7 +174,7 @@ TEST_SUITE("resolve_pivot") {
   }
 
   TEST_CASE("full-canvas single value sets y") {
-    auto result = resolve_pivot("full-canvas:0.18");
+    const auto result = resolve_pivot("full-canvas:0.18");
     REQUIRE(result);
     CHECK_EQ(result->x, doctest::Approx(0.5));
     CHECK_EQ(result->y, doctest::Approx(0.18));
@@ -182,7 +182,7 @@ TEST_SUITE("resolve_pivot") {
   }
 
   TEST_CASE("full-canvas x,y value sets both") {
-    auto result = resolve_pivot("full-canvas:0.5,0.18");
+    const auto result = resolve_pivot("full-canvas:0.5,0.18");
     REQUIRE(result);
     CHECK_EQ(result->x, doctest::Approx(0.5));
     CHECK_EQ(result->y, doctest::Approx(0.18));
@@ -190,7 +190,7 @@ TEST_SUITE("resolve_pivot") {
   }
 
   TEST_CASE("unknown preset is rejected") {
-    auto result = resolve_pivot("bogus");
+    const auto result = resolve_pivot("bogus");
     CHECK_FALSE(result);
     CHECK(result.error().find("Invalid --pivot value") != std::string::npos);
   }
@@ -221,10 +221,10 @@ TEST_SUITE("validate_animation_naming") {
         "knight_walk_north_1.png",
         "knight_walk_south_0.png", // missing frame 1
     };
-    auto result = validate_animation_naming(files);
+    const auto result = validate_animation_naming(files);
     CHECK_FALSE(result);
     CHECK(result.error().find("south") != std::string::npos);
-    CHECK(result.error().find("1") != std::string::npos);
+    CHECK(result.error().find('1') != std::string::npos);
   }
 
   TEST_CASE("ignores files that don't match the naming convention") {
@@ -240,14 +240,14 @@ TEST_SUITE("validate_animation_naming") {
 
 TEST_SUITE("glob_to_regex") {
   TEST_CASE("star wildcard matches multiple files") {
-    auto re = glob_to_regex("*.png");
+    const auto re = glob_to_regex("*.png");
     CHECK(std::regex_match("sprite.png", re));
     CHECK(std::regex_match("SPRITE.PNG", re)); // icase
     CHECK_FALSE(std::regex_match("sprite.jpg", re));
   }
 
   TEST_CASE("question mark matches single character") {
-    auto re = glob_to_regex("tile?.png");
+    const auto re = glob_to_regex("tile?.png");
     CHECK(std::regex_match("tile1.png", re));
     CHECK(std::regex_match("tileA.png", re));
     CHECK_FALSE(std::regex_match("tile12.png", re));
@@ -255,71 +255,71 @@ TEST_SUITE("glob_to_regex") {
   }
 
   TEST_CASE("dot is escaped, not treated as any character") {
-    auto re = glob_to_regex("a.b");
+    const auto re = glob_to_regex("a.b");
     CHECK_FALSE(std::regex_match("acb", re));
     CHECK(std::regex_match("a.b", re));
   }
 
   TEST_CASE("case insensitive matching") {
-    auto re = glob_to_regex("*.PNG");
+    const auto re = glob_to_regex("*.PNG");
     CHECK(std::regex_match("sprite.png", re));
     CHECK(std::regex_match("SPRITE.PNG", re));
   }
 
   TEST_CASE("partial prefix wildcard") {
-    auto re = glob_to_regex("chest_*");
+    const auto re = glob_to_regex("chest_*");
     CHECK(std::regex_match("chest_open.png", re));
     CHECK(std::regex_match("chest_closed.png", re));
     CHECK_FALSE(std::regex_match("open.png", re));
   }
 
   TEST_CASE("multiple wildcards") {
-    auto re = glob_to_regex("*.*.png");
+    const auto re = glob_to_regex("*.*.png");
     CHECK(std::regex_match("sprite.1.png", re));
     CHECK(std::regex_match("a.b.png", re));
   }
 
   TEST_CASE("only question marks") {
-    auto re = glob_to_regex("???");
+    const auto re = glob_to_regex("???");
     CHECK(std::regex_match("abc", re));
     CHECK_FALSE(std::regex_match("ab", re));
     CHECK_FALSE(std::regex_match("abcd", re));
   }
 
   TEST_CASE("exact match with no wildcards") {
-    auto re = glob_to_regex("sprite.png");
+    const auto re = glob_to_regex("sprite.png");
     CHECK(std::regex_match("sprite.png", re));
     CHECK_FALSE(std::regex_match("sprite2.png", re));
   }
 
   TEST_CASE("square brackets are preserved") {
-    auto re = glob_to_regex("[abc]");
+    const auto re = glob_to_regex("[abc]");
     CHECK(std::regex_match("a", re));
     CHECK(std::regex_match("b", re));
     CHECK_FALSE(std::regex_match("d", re));
   }
 
   TEST_CASE("regex metacharacters in filename are escaped") {
-    auto re = glob_to_regex("file+(1).png");
+    const auto re = glob_to_regex("file+(1).png");
     CHECK(std::regex_match("file+(1).png", re));
     CHECK_FALSE(std::regex_match("fileXXX1Xpng", re));
   }
 
   TEST_CASE("bracket negation [!...] excludes listed characters") {
-    auto re = glob_to_regex("[!abc].png");
+    const auto re = glob_to_regex("[!abc].png");
     CHECK(std::regex_match("d.png", re));
     CHECK_FALSE(std::regex_match("a.png", re));
     CHECK_FALSE(std::regex_match("b.png", re));
   }
 
   TEST_CASE("exclamation outside brackets is a literal character") {
-    auto re = glob_to_regex("file!.png");
+    const auto re = glob_to_regex("file!.png");
     CHECK(std::regex_match("file!.png", re));
     CHECK_FALSE(std::regex_match("file.png", re));
   }
 
   TEST_CASE("unclosed bracket with content is auto-closed") {
-    auto re = glob_to_regex("tile[abc");
+    const auto re = glob_to_regex("tile[abc");
     CHECK(std::regex_match("tilea", re));
     CHECK(std::regex_match("tileb", re));
     CHECK_FALSE(std::regex_match("tiled", re));
@@ -327,14 +327,14 @@ TEST_SUITE("glob_to_regex") {
   }
 
   TEST_CASE("unclosed empty bracket matches literal '['") {
-    auto re = glob_to_regex("file[");
+    const auto re = glob_to_regex("file[");
     CHECK(std::regex_match("file[", re));
     CHECK_FALSE(std::regex_match("file", re));
     CHECK_FALSE(std::regex_match("filea", re));
   }
 
   TEST_CASE("unclosed negated bracket is auto-closed") {
-    auto re = glob_to_regex("tile[!xyz");
+    const auto re = glob_to_regex("tile[!xyz");
     CHECK(std::regex_match("tileA", re));
     CHECK_FALSE(std::regex_match("tilex", re));
     CHECK_FALSE(std::regex_match("tiley", re));
@@ -343,24 +343,24 @@ TEST_SUITE("glob_to_regex") {
 
 TEST_SUITE("resolve_input_files") {
   TEST_CASE("only PNG files are allowed") {
-    auto result = resolve_input_files(fs::current_path(), "image.jpg");
+    const auto result = resolve_input_files(fs::current_path(), "image.jpg");
     CHECK_FALSE(result);
   }
 
   TEST_CASE("directory with no pngs returns an error") {
-    auto result = resolve_input_files(fs::current_path(), "");
+    const auto result = resolve_input_files(fs::current_path(), "");
     CHECK_FALSE(result);
     CHECK(result.error().find("No PNG files found") != std::string::npos);
   }
 
   TEST_CASE("non-existent directory returns an error") {
-    auto result = resolve_input_files("/spritepacker_nonexistent_dir_abc123", "");
+    const auto result = resolve_input_files("/spritepacker_nonexistent_dir_abc123", "");
     CHECK_FALSE(result);
     CHECK(result.error().find("Cannot read directory") != std::string::npos);
   }
 
   TEST_CASE("uppercase glob pattern finds lowercase .png files") {
-    auto result = resolve_input_files(fs::path{TEST_FIXTURES_DIR}, "*.PNG");
+    const auto result = resolve_input_files(fs::path{TEST_FIXTURES_DIR}, "*.PNG");
     CHECK(result);
     if (result)
       CHECK_EQ(result->size(), 1u);

@@ -4,15 +4,45 @@
 #include "options.hpp"
 #include <doctest/doctest.h>
 
-#include <span>
+#include <expected>
+#include <initializer_list>
 #include <string>
 #include <string_view>
+#include <vector>
+
+namespace {
+
+  std::expected<Options, std::string> run_parse_args(std::initializer_list<std::string_view> args) {
+    std::vector<std::string> storage(args.begin(), args.end());
+    std::vector<char *> argv;
+    argv.reserve(storage.size());
+    for (auto &arg : storage) {
+      argv.push_back(arg.data());
+    }
+    return Options::parse_args(argv);
+  }
+
+} // namespace
 
 TEST_SUITE("Options::parse_args") {
   TEST_CASE("parses valid options") {
-    const char *argv[] = {"prog",       "--input",    "/src",      "--sheets",  "/out", "--name",  "atlas", "--files",
-                          "chest*.png", "--max-size", "1024x1024", "--padding", "2",    "--pivot", "center"};
-    auto result = Options::parse_args(std::span<char *>(const_cast<char **>(argv), std::size(argv)));
+    auto result = run_parse_args({
+        "prog",
+        "--input",
+        "/src",
+        "--sheets",
+        "/out",
+        "--name",
+        "atlas",
+        "--files",
+        "chest*.png",
+        "--max-size",
+        "1024x1024",
+        "--padding",
+        "2",
+        "--pivot",
+        "center",
+    });
     CHECK(result);
     CHECK_EQ(result->input, "/src");
     CHECK_EQ(result->sheets, "/out");
@@ -24,24 +54,30 @@ TEST_SUITE("Options::parse_args") {
   }
 
   TEST_CASE("parses boolean flags") {
-    const char *argv[] = {"prog", "--input", "/src", "--sheets", "/out", "--name", "atlas", "--validate-animations",
-                          "--pot"};
-    auto result = Options::parse_args(std::span<char *>(const_cast<char **>(argv), std::size(argv)));
+    auto result = run_parse_args({
+        "prog",
+        "--input",
+        "/src",
+        "--sheets",
+        "/out",
+        "--name",
+        "atlas",
+        "--validate-animations",
+        "--pot",
+    });
     CHECK(result);
     CHECK(result->validate_animations);
     CHECK(result->pot);
   }
 
   TEST_CASE("returns an error with invalid arguments") {
-    const char *argv[] = {"prog", "--input", ".", "--sheets", ".", "--name", "test", "--foo", "bar"};
-    auto result = Options::parse_args(std::span<char *>(const_cast<char **>(argv), std::size(argv)));
+    auto result = run_parse_args({"prog", "--input", ".", "--sheets", ".", "--name", "test", "--foo", "bar"});
     CHECK_FALSE(result);
     CHECK(result.error().find("Unknown argument '--foo'") != std::string::npos);
   }
 
   TEST_CASE("rejects flag where value is expected") {
-    const char *argv[] = {"prog", "--input", "-h"};
-    auto result = Options::parse_args(std::span<char *>(const_cast<char **>(argv), std::size(argv)));
+    auto result = run_parse_args({"prog", "--input", "-h"});
     CHECK_FALSE(result);
     CHECK(result.error().find("Unexpected flag") != std::string::npos);
   }
@@ -123,7 +159,7 @@ TEST_SUITE("Options::validate") {
          {"full-canvas:", "full-canvas:abc", "full-canvas:0.5,abc", "full-canvas:,0.18"}) {
       opts.pivot = pivot;
       CAPTURE(pivot);
-      auto result = opts.validate();
+      const auto result = opts.validate();
       CHECK_FALSE(result);
     }
   }
