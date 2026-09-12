@@ -2,7 +2,7 @@
 
 All notable changes to this project are documented here.
 
-## [Unreleased]
+## [0.4.1] — 2026-09-11
 
 ### Added
 
@@ -12,6 +12,7 @@ All notable changes to this project are documented here.
 
 ### Changed
 
+- **Redesigned CLI output**: `--help` is now grouped (Input/Output/Layout/Behavior) and trimmed to a scannable length, and a run prints numbered `[n/3]` steps followed by a summary panel instead of per-file listings and flat status lines.
 - **Build now prefers LLVM/Clang**: the compiler is pinned to a discovered LLVM install (`LLVM_PREFIX`, Homebrew, `llvm-config`, the Windows LLVM installer, or `clang++` on `PATH`), falling back to the system compiler when none is found. First-party targets are now built with `-Werror`.
 - **Build presets renamed**: `build-debug`/`build-release` are now `build`/`release`.
 
