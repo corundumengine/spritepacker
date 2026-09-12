@@ -2,6 +2,19 @@
 
 All notable changes to this project are documented here.
 
+## [Unreleased]
+
+### Added
+
+- **`format_code` target and `format` build preset**: run `clang-format` over every first-party source with `cmake --build --preset format`.
+- **`scripts/run_tidy.sh`**: run `clang-tidy` over an explicit file list against the project compile database.
+- **`relwithdebinfo` and `debug-sanitized` presets** (ASan + UBSan), each with matching build and test presets.
+
+### Changed
+
+- **Build now prefers LLVM/Clang**: the compiler is pinned to a discovered LLVM install (`LLVM_PREFIX`, Homebrew, `llvm-config`, the Windows LLVM installer, or `clang++` on `PATH`), falling back to the system compiler when none is found. First-party targets are now built with `-Werror`.
+- **Build presets renamed**: `build-debug`/`build-release` are now `build`/`release`.
+
 ## [0.4.0] — 2026-08-16
 
 ### Added

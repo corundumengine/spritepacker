@@ -115,7 +115,8 @@ TEST_SUITE("Options::validate") {
     opts.input = "/src";
     opts.sheets = "/out";
     opts.name = "atlas";
-    for (const std::string_view pivot : {"full-canvas:", "full-canvas:abc", "full-canvas:0.5,abc", "full-canvas:,0.18"}) {
+    for (const std::string_view pivot :
+         {"full-canvas:", "full-canvas:abc", "full-canvas:0.5,abc", "full-canvas:,0.18"}) {
       opts.pivot = pivot;
       CAPTURE(pivot);
       auto result = opts.validate();

@@ -193,7 +193,8 @@ TEST_SUITE("resolve_pivot") {
   }
 
   TEST_CASE("non-numeric full-canvas suffix is rejected") {
-    for (const std::string_view preset : {"full-canvas:", "full-canvas:abc", "full-canvas:0.5,abc", "full-canvas:,0.18"}) {
+    for (const std::string_view preset :
+         {"full-canvas:", "full-canvas:abc", "full-canvas:0.5,abc", "full-canvas:,0.18"}) {
       CAPTURE(preset);
       CHECK_FALSE(resolve_pivot(preset));
     }

@@ -1,8 +1,8 @@
 {
   "version": 6,
   "cmakeMinimumRequired": {
-    "major": 3,
-    "minor": 28,
+    "major": 4,
+    "minor": 3,
     "patch": 0
   },
 
@@ -13,29 +13,105 @@
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/build",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug"
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_POLICY_VERSION_MINIMUM": "3.5",
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/cmake/llvm-clang.cmake"
       }
     },
     {
       "name": "release",
-      "displayName": "Release",
+      "displayName": "Release (optimised, no debug symbols)",
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/build-release",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "BUILD_TESTING": "ON"
+        "CMAKE_POLICY_VERSION_MINIMUM": "3.5",
+        "CMAKE_INTERPROCEDURAL_OPTIMIZATION": "ON",
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/cmake/llvm-clang.cmake"
+      }
+    },
+    {
+      "name": "relwithdebinfo",
+      "displayName": "RelWithDebInfo (optimised + debug symbols)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build-relwithdebinfo",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "CMAKE_POLICY_VERSION_MINIMUM": "3.5",
+        "CMAKE_INTERPROCEDURAL_OPTIMIZATION": "ON",
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/cmake/llvm-clang.cmake"
+      }
+    },
+    {
+      "name": "debug-sanitized",
+      "displayName": "Debug (ASan + UBSan)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build-sanitized",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_POLICY_VERSION_MINIMUM": "3.5",
+        "CMAKE_CXX_FLAGS": "-fsanitize=address,undefined -fno-omit-frame-pointer",
+        "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=address,undefined",
+        "CMAKE_SHARED_LINKER_FLAGS": "-fsanitize=address,undefined",
+        "CMAKE_MODULE_LINKER_FLAGS": "-fsanitize=address,undefined",
+        "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/cmake/llvm-clang.cmake"
       }
     }
   ],
 
   "buildPresets": [
     {
-      "name": "build-debug",
+      "name": "build",
       "configurePreset": "debug"
     },
     {
-      "name": "build-release",
+      "name": "release",
       "configurePreset": "release"
+    },
+    {
+      "name": "relwithdebinfo",
+      "configurePreset": "relwithdebinfo"
+    },
+    {
+      "name": "debug-sanitized",
+      "configurePreset": "debug-sanitized",
+      "verbose": true
+    },
+    {
+      "name": "format",
+      "configurePreset": "debug",
+      "targets": ["format_code"]
+    }
+  ],
+
+  "testPresets": [
+    {
+      "name": "test",
+      "configurePreset": "debug",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "release",
+      "configurePreset": "release",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "relwithdebinfo",
+      "configurePreset": "relwithdebinfo",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "debug-sanitized",
+      "configurePreset": "debug-sanitized",
+      "output": {
+        "outputOnFailure": true
+      }
     }
   ]
 }

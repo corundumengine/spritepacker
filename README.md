@@ -7,11 +7,21 @@ A CLI tool for packing sprite frames into texture atlases. **Pre-alpha — under
 
 ## Build
 
+Requires a C++23 compiler and CMake 3.28+ (the presets need CMake 4.3+).
+Dependencies (nlohmann/json, lodepng, doctest) are fetched automatically via
+FetchContent.
+
+The build prefers its own LLVM/Clang when one is found — a `LLVM_PREFIX`
+variable or environment variable, Homebrew (macOS), `llvm-config` (Linux), the
+LLVM installer (Windows), or `clang++` on `PATH` — and otherwise falls back to
+the system compiler. Pin a specific install with `-DLLVM_PREFIX=/path/to/llvm`
+or `-DCMAKE_CXX_COMPILER=clang++`.
+
 ### Release
 
 ```bash
 cmake --preset release
-cmake --build build-release
+cmake --build --preset release
 cmake --install build-release --prefix dist
 ```
 
@@ -21,11 +31,21 @@ The executable will be at `dist/bin/spritepacker`.
 
 ```bash
 cmake --preset debug
-cmake --build build
+cmake --build --preset build
 ```
 
-Requires a C++23 compiler and CMake 3.28+. Dependencies (nlohmann/json,
-lodepng, doctest) are fetched automatically via FetchContent.
+`relwithdebinfo` (optimised + symbols) and `debug-sanitized` (ASan + UBSan) are
+also available; each has a matching build and test preset.
+
+### Formatting & linting
+
+`clang-format` and `clang-tidy` come from the same LLVM install and are
+optional — the build configures without them.
+
+```bash
+cmake --build --preset format        # clang-format all first-party sources
+scripts/run_tidy.sh src/main.cpp     # clang-tidy explicit files
+```
 
 ## Usage
 
@@ -176,13 +196,14 @@ and are expected to be compressed by a later build step if the target platform n
 
 ## Testing
 
-The release preset enables tests by default. Run:
+Tests build by default. Run the debug suite with:
 
 ```bash
-ctest --test-dir build-release --output-on-failure
+ctest --preset test
 ```
 
-Or with a debug build:
+Matching test presets exist for `release`, `relwithdebinfo`, and
+`debug-sanitized`. Or point ctest at a build directory directly:
 
 ```bash
 ctest --test-dir build --output-on-failure
