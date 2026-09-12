@@ -2,13 +2,19 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "sprite_packer.hpp"
+#include "nlohmann/json_fwd.hpp"
+#include "options.hpp"
 #include "rect_packer.hpp"
+#include "sprites.hpp"
 #include "utils.hpp"
 
 #include <algorithm>
 #include <atomic>
 #include <bit>
 #include <cassert>
+#include <cstddef>
+#include <cstdint>
+#include <expected>
 #include <filesystem>
 #include <format>
 #include <fstream>
@@ -16,8 +22,13 @@
 #include <mutex>
 #include <nlohmann/json.hpp>
 #include <numeric>
+#include <optional>
+#include <string>
+#include <string_view>
 #include <thread>
 #include <unordered_map>
+#include <utility>
+#include <vector>
 
 using json = nlohmann::json;
 

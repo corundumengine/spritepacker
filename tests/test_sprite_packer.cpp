@@ -1,10 +1,19 @@
 // SPDX-FileCopyrightText: 2026 Gentle Lion Studios, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+#include "nlohmann/json_fwd.hpp"
+#include "options.hpp"
 #include "sprite_packer.hpp"
+#include "sprites.hpp"
+#include <algorithm>
+#include <cstddef>
 #include <doctest/doctest.h>
+#include <filesystem>
 #include <fstream>
 #include <nlohmann/json.hpp>
+#include <system_error>
+#include <utility>
+#include <vector>
 
 TEST_SUITE("PackData::from_options") {
   TEST_CASE("non-existent source directory") {

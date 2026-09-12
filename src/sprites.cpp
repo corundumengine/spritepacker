@@ -4,8 +4,12 @@
 #include "sprites.hpp"
 
 #include <algorithm>
+#include <cstddef>
+#include <expected>
+#include <filesystem>
 #include <format>
 #include <lodepng.h>
+#include <string>
 
 std::expected<void, std::string> Sprite::load(const std::filesystem::path &path) {
   unsigned w{}, h{};

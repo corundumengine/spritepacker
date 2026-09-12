@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "sprites.hpp"
+#include <cstddef>
 #include <doctest/doctest.h>
 
 TEST_SUITE("Sprite::is_valid") {

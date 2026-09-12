@@ -5,6 +5,9 @@
 #include <doctest/doctest.h>
 
 #include <filesystem>
+#include <regex>
+#include <string>
+#include <vector>
 
 namespace fs = std::filesystem;
 

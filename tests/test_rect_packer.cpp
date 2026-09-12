@@ -4,6 +4,7 @@
 #include "rect_packer.hpp"
 #include <doctest/doctest.h>
 
+#include <utility>
 #include <vector>
 
 namespace {

@@ -5,6 +5,8 @@
 #include <doctest/doctest.h>
 
 #include <span>
+#include <string>
+#include <string_view>
 
 TEST_SUITE("Options::parse_args") {
   TEST_CASE("parses valid options") {

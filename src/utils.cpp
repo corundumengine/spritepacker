@@ -6,12 +6,21 @@
 #include <algorithm>
 #include <cctype>
 #include <charconv>
+#include <cstddef>
+#include <expected>
+#include <filesystem>
 #include <format>
+#include <iterator>
 #include <map>
 #include <ranges>
+#include <regex>
 #include <set>
+#include <string>
+#include <string_view>
 #include <system_error>
+#include <tuple>
 #include <unordered_set>
+#include <vector>
 
 std::regex glob_to_regex(std::string_view pattern) {
   std::string re;

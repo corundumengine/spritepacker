@@ -4,7 +4,11 @@
 #include "rect_packer.hpp"
 
 #include <algorithm>
+#include <cstddef>
 #include <limits>
+#include <optional>
+#include <utility>
+#include <vector>
 
 MaxRectsPacker::MaxRectsPacker(int width, int height) : width_(width), height_(height) {
   free_rects_.push_back(PackedRect{0, 0, width, height});

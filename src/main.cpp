@@ -9,6 +9,7 @@
 #include <array>
 #include <chrono>
 #include <cstddef>
+#include <cstdio>
 #include <cstdlib>
 #include <filesystem>
 #include <format>
