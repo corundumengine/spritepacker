@@ -1,9 +1,11 @@
-# Spritepacker
+<h1 align="center"><code>▄▀ SPRITEPACKER</code></h1>
 
 [![Language](https://img.shields.io/badge/language-C++-blue.svg)](https://isocpp.org/)
 [![Standard](https://img.shields.io/badge/c%2B%2B-23-blue.svg)](https://en.wikipedia.org/wiki/C%2B%2B23)
 
-A CLI tool for packing sprite frames into texture atlases. **Pre-alpha — under active development, expect breakage.**
+A **sprite atlas packer** — a CLI tool that trims, deduplicates, and packs PNG frames into texture atlases.
+
+_Pre-alpha — under active development, expect breakage._
 
 ## Build
 
@@ -62,22 +64,32 @@ up as much space as its visible content needs, rather than a fixed grid cell. Th
 isometric sprite sets, where a "walk" animation frame and a tiny prop icon can differ wildly in
 trimmed size.
 
+The `--input`, `--sheets`, and `--assets` directories must already exist — Spritepacker writes into
+them but does not create them.
+
 ### Options
 
-| Flag                    | Description                                                                                                                                                                    |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `--input, -i <dir>`     | Source directory containing PNG files (required)                                                                                                                               |
-| `--sheets <dir>`        | Output directory for JSON sheet metadata (required)                                                                                                                            |
-| `--assets <dir>`        | Output directory for PNG sprite sheets (default: same as `--sheets`)                                                                                                           |
-| `--name, -n <name>`     | Base name for output files, e.g. `terrain` → `terrain.png`, `terrain.json` (required)                                                                                          |
-| `--files, -f <list>`    | Comma-separated filenames or glob patterns (default: `*.png`)                                                                                                                  |
-| `--max-size, -m WxH`    | Maximum atlas size per sheet (default: `2048x2048`); sprites that don't fit start a new sheet                                                                                  |
-| `--padding, -p <n>`     | Pixel gap between packed sprites, to avoid texture-filtering bleed (default: `1`)                                                                                              |
-| `--pivot <preset>`      | Sprite anchor — see [Pivot / depth-sort](#pivot--depth-sort). Presets: `bottom-center` (default), `center`, `top-center`, `top-left`, or `full-canvas[:Y]` / `full-canvas:X,Y` |
-| `--validate-animations` | Require animation frame sets to match across facings — see [Animation naming](#animation-naming)                                                                               |
-| `--pot`                 | Round each sheet's final width/height up to the next power of two                                                                                                              |
-| `--help, -h`            | Show usage information                                                                                                                                                         |
-| `--version, -v`         | Print version number                                                                                                                                                           |
+| Flag | Description |
+| --- | --- |
+| `-i, --input <dir>` | Source directory containing PNG files (required; scanned non-recursively) |
+| `--sheets <dir>` | Output directory for JSON sheet metadata (required) |
+| `--assets <dir>` | Output directory for PNG sprite sheets (default: same as `--sheets`) |
+| `-n, --name <name>` | Base name for output files, e.g. `terrain` → `terrain.png`, `terrain.json` (required) |
+| `-f, --files <list>` | Comma-separated filenames or glob patterns (default: `*.png`) — see [File selection](#file-selection) |
+| `-m, --max-size <WxH>` | Maximum atlas size per sheet (default: `2048x2048`); sprites that don't fit start a new sheet |
+| `-p, --padding <n>` | Pixel gap between packed sprites, to avoid texture-filtering bleed (default: `1`) |
+| `--pivot <preset>` | Sprite anchor — see [Pivot / depth-sort](#pivot--depth-sort). Presets: `bottom-center` (default), `center`, `top-center`, `top-left`, or `full-canvas[:Y]` / `full-canvas:X,Y` |
+| `--validate-animations` | Require animation frame sets to match across facings — see [Animation naming](#animation-naming) |
+| `--pot` | Round each sheet's final width/height up to the next power of two |
+| `-h, --help` | Show this help |
+| `-v, --version` | Print version number |
+
+### File selection
+
+`--files` accepts exact filenames and glob patterns separated by commas. Exact names are added in
+the order listed; glob matches are sorted alphabetically by filename. Patterns support `*`, `?`,
+`[abc]`, and `[!abc]`, matched case-insensitively, and duplicate matches are skipped. Omit
+`--files` to include every PNG directly in `--input` (subdirectories are not scanned).
 
 ### Examples
 
@@ -132,20 +144,21 @@ pivots (y from the top).
 
 ## Animation naming
 
-`--validate-animations` checks that input filenames follow the
-`<unit>_<state>_<facing>_<frame>.png` convention (e.g. `knight_walk_south_2.png`) and that, for
-every `<unit>_<state>` animation with more than one facing, all facings share the same set of frame
-indices. If a facing is missing a frame another facing has, the tool fails with a non-zero exit
-code and a message naming exactly which animation, facing, and frame is missing — instead of
-silently packing an incomplete set and only noticing at runtime. Filenames that don't match the
-convention are ignored by this check (e.g. non-directional sprites like `chest_open.png`).
+`--validate-animations` checks directional animation sets. For files named
+`<unit>_<state>_<facing>_<frame>.png` (e.g. `knight_walk_south_2.png`), every `<unit>_<state>`
+animation with more than one facing must use the same frame indices across all of its facings. If a
+facing is missing a frame another facing has, the tool exits non-zero with a message naming the
+animation, facing, and frame — instead of silently packing an incomplete set and only noticing at
+runtime. Files that don't match the naming convention are ignored (e.g. non-directional sprites
+like `chest_open.png`).
 
 ## Output
 
 For each atlas sheet, Spritepacker generates:
 
-- **`{name}.png`** (or `{name}-N.png` for sheet N when multiple sheets are needed) — the packed texture atlas.
-- **`{name}.json`** (or `{name}-N.json`) — metadata for that sheet:
+- **`{name}.png`** — the packed texture atlas. When more than one sheet is needed, sheets are
+  numbered from zero: `{name}-0.png`, `{name}-1.png`, …
+- **`{name}.json`** — metadata for the matching sheet (`{name}.json`, `{name}-0.json`, …):
 
 ```json
 {
@@ -188,11 +201,11 @@ and are expected to be compressed by a later build step if the target platform n
 
 ## Dependencies
 
-| Library                                           | Purpose             |
-| ------------------------------------------------- | ------------------- |
+| Library | Purpose |
+| --- | --- |
 | [nlohmann/json](https://github.com/nlohmann/json) | JSON parsing/output |
-| [lodepng](https://github.com/lvandeve/lodepng)    | PNG encoding        |
-| [doctest](https://github.com/doctest/doctest)     | Unit testing        |
+| [lodepng](https://github.com/lvandeve/lodepng) | PNG decoding/encoding |
+| [doctest](https://github.com/doctest/doctest) | Unit testing |
 
 ## Testing
 

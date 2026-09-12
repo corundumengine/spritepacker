@@ -16,7 +16,6 @@
 #include <mutex>
 #include <nlohmann/json.hpp>
 #include <numeric>
-#include <print>
 #include <thread>
 #include <unordered_map>
 
@@ -138,10 +137,6 @@ std::expected<PackData, std::string> PackData::from_options(const Options &optio
   auto input_files = resolve_input_files(source_dir, options.files);
   if (!input_files)
     return std::unexpected(input_files.error());
-
-  std::println("Found {} sprite file(s):", input_files->size());
-  for (const auto &f : *input_files)
-    std::println("  {}", fs::path(f).filename().string());
 
   if (options.validate_animations) {
     if (auto result = validate_animation_naming(*input_files); !result)
@@ -281,9 +276,6 @@ std::expected<PackData, std::string> PackData::from_options(const Options &optio
   }
 
   const int num_sheets{static_cast<int>(packers.size())};
-  const std::size_t duplicate_count{images->size() - unique_images.size()};
-  std::println("Packed {} unique sprite(s) ({} duplicate(s) deduplicated) into {} sheet(s).", unique_images.size(),
-               duplicate_count, num_sheets);
 
   return PackData{
       .sheets_dir = sheets_dir,
