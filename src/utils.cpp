@@ -39,26 +39,26 @@ std::regex glob_to_regex(std::string_view pattern) {
       }
     } else {
       switch (c) {
-      case '*':
-        re += ".*";
-        break;
-      case '?':
-        re += '.';
-        break;
-      case '.':
-        re += "\\.";
-        break;
-      case '[':
-        re += '[';
-        in_bracket = true;
-        next_is_bracket_start = true;
-        bracket_chars = 0;
-        break;
-      default:
-        if (k_regex_meta.find(c) != std::string_view::npos)
-          re += '\\';
-        re += c;
-        break;
+        case '*':
+          re += ".*";
+          break;
+        case '?':
+          re += '.';
+          break;
+        case '.':
+          re += "\\.";
+          break;
+        case '[':
+          re += '[';
+          in_bracket = true;
+          next_is_bracket_start = true;
+          bracket_chars = 0;
+          break;
+        default:
+          if (k_regex_meta.find(c) != std::string_view::npos)
+            re += '\\';
+          re += c;
+          break;
       }
     }
   }
@@ -128,10 +128,9 @@ namespace {
   constexpr double k_half{0.5};
 
   std::string invalid_pivot_message(std::string_view preset) {
-    return std::format(
-        "Invalid --pivot value '{}'. Use a preset (bottom-center, center, top-center, top-left) or "
-        "full-canvas with an optional value (full-canvas, full-canvas:0.18, full-canvas:0.5,0.18)",
-        preset);
+    return std::format("Invalid --pivot value '{}'. Use a preset (bottom-center, center, top-center, top-left) or "
+                       "full-canvas with an optional value (full-canvas, full-canvas:0.18, full-canvas:0.5,0.18)",
+                       preset);
   }
 } // namespace
 
