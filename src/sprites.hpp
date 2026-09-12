@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Gentle Lion Studios, Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 #ifndef SPRITES_HPP
 #define SPRITES_HPP
 

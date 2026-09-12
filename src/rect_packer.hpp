@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Gentle Lion Studios, Inc.
+// SPDX-License-Identifier: Apache-2.0
+
 #ifndef RECT_PACKER_HPP
 #define RECT_PACKER_HPP
 
