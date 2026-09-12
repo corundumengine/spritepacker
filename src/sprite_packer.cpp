@@ -30,7 +30,7 @@
 #include <utility>
 #include <vector>
 
-using json = nlohmann::json;
+using nlohmann::json;
 
 namespace fs = std::filesystem;
 
@@ -55,6 +55,21 @@ namespace {
     return parse_int(s, option_name);
   }
 
+  void record_error(std::string &first_error, std::mutex &error_mutex, std::string message) {
+    const std::scoped_lock lock{error_mutex};
+    if (first_error.empty())
+      first_error = std::move(message);
+  }
+
+  void load_one(const std::string &file, Sprite &image, std::string &first_error, std::mutex &error_mutex) {
+    if (const auto result = image.load(file); !result) {
+      record_error(first_error, error_mutex, std::format("Could not load sprite: {} ({})", file, result.error()));
+      return;
+    }
+    if (!image.is_valid())
+      record_error(first_error, error_mutex, std::format("Invalid sprite (0x0) in: {}", file));
+  }
+
   /** Decodes every file in @p files concurrently. Sprite order in the result matches @p files. */
   std::expected<std::vector<Sprite>, std::string> load_sprites_parallel(const std::vector<std::string> &files) {
     std::vector<Sprite> images(files.size());
@@ -63,7 +78,8 @@ namespace {
     std::string first_error;
 
     const unsigned worker_count{
-        std::max(1u, std::min(std::thread::hardware_concurrency(), static_cast<unsigned>(files.size())))};
+        std::max(1u, std::min(std::thread::hardware_concurrency(), static_cast<unsigned>(files.size()))),
+    };
     {
       std::vector<std::jthread> workers;
       workers.reserve(worker_count);
@@ -73,17 +89,7 @@ namespace {
             const std::size_t i{next_index.fetch_add(1)};
             if (i >= files.size())
               break;
-            if (auto result = images[i].load(files[i]); !result) {
-              const std::lock_guard lock{error_mutex};
-              if (first_error.empty())
-                first_error = std::format("Could not load sprite: {} ({})", files[i], result.error());
-              continue;
-            }
-            if (!images[i].is_valid()) {
-              const std::lock_guard lock{error_mutex};
-              if (first_error.empty())
-                first_error = std::format("Invalid sprite (0x0) in: {}", files[i]);
-            }
+            load_one(files[i], images[i], first_error, error_mutex);
           }
         });
       }
@@ -111,28 +117,169 @@ namespace {
     assert(dest_x + trim.w <= atlas.width && dest_y + trim.h <= atlas.height);
     const auto row_bytes = static_cast<std::size_t>(trim.w) * k_bytes_per_pixel;
     for (int row = 0; row < trim.h; ++row) {
-      const auto src = static_cast<std::size_t>((trim.y + row) * sprite.width + trim.x) * k_bytes_per_pixel;
-      const auto dst = static_cast<std::size_t>((dest_y + row) * atlas.width + dest_x) * k_bytes_per_pixel;
+      const auto src = static_cast<std::size_t>(((trim.y + row) * sprite.width) + trim.x) * k_bytes_per_pixel;
+      const auto dst = static_cast<std::size_t>(((dest_y + row) * atlas.width) + dest_x) * k_bytes_per_pixel;
       std::copy_n(sprite.data.data() + src, row_bytes, atlas.data.data() + dst);
     }
+  }
+
+  std::expected<void, std::string> require_directory(const fs::path &dir, std::string_view label,
+                                                     std::string_view value) {
+    if (fs::exists(dir) && fs::is_directory(dir))
+      return {};
+    return std::unexpected(std::format("{} directory does not exist: {}", label, value));
+  }
+
+  struct SpriteTrims {
+    std::vector<TrimRect> trims;
+    std::vector<std::string> names;
+  };
+
+  std::expected<SpriteTrims, std::string> compute_trims_and_validate(const std::vector<Sprite> &images, int padding,
+                                                                     int max_w, int max_h) {
+    SpriteTrims result;
+    result.trims.resize(images.size());
+    result.names.reserve(images.size());
+    for (std::size_t i = 0; i < images.size(); ++i) {
+      result.trims[i] = compute_trim(images[i]);
+      result.names.push_back(images[i].name);
+      if (result.trims[i].w + padding > max_w || result.trims[i].h + padding > max_h)
+        return std::unexpected(std::format(
+            "Sprite '{}' ({}x{} after trimming) plus padding ({}) exceeds --max-size {}x{}; increase --max-size, "
+            "reduce --padding, or split the sprite",
+            result.names[i], result.trims[i].w, result.trims[i].h, padding, max_w, max_h));
+    }
+    return result;
+  }
+
+  struct DedupResult {
+    std::vector<Sprite> unique_images;
+    std::vector<TrimRect> unique_trims;
+    std::vector<int> sprite_unique_index;
+  };
+
+  // Deduplicate by trimmed pixel content: identical frames reused across states (e.g. an idle
+  // frame shared with an attack-recovery frame) are packed once and every referencing name in the
+  // exported metadata points at that single packed instance.
+  DedupResult deduplicate_sprites(std::vector<Sprite> &images, const std::vector<TrimRect> &trims) {
+    DedupResult result;
+    result.sprite_unique_index.resize(images.size());
+    std::unordered_map<std::size_t, std::vector<int>> hash_buckets;
+
+    for (std::size_t i = 0; i < images.size(); ++i) {
+      const std::size_t hash{compute_content_hash(images[i], trims[i])};
+      int found{-1};
+      if (const auto it = hash_buckets.find(hash); it != hash_buckets.end()) {
+        for (const int idx : it->second) {
+          if (trimmed_content_equal(images[i], trims[i], result.unique_images[static_cast<std::size_t>(idx)],
+                                    result.unique_trims[static_cast<std::size_t>(idx)])) {
+            found = idx;
+            break;
+          }
+        }
+      }
+      if (found >= 0) {
+        result.sprite_unique_index[i] = found;
+        continue;
+      }
+      result.unique_trims.push_back(trims[i]);
+      result.unique_images.push_back(std::move(images[i]));
+      const int new_idx{static_cast<int>(result.unique_images.size()) - 1};
+      hash_buckets[hash].push_back(new_idx);
+      result.sprite_unique_index[i] = new_idx;
+    }
+    return result;
+  }
+
+  struct Placement {
+    int sheet_index{-1};
+    PackedRect rect;
+  };
+
+  struct PackLayout {
+    std::vector<Placement> placements;
+    std::vector<std::pair<int, int>> sheet_sizes;
+    int num_sheets{};
+  };
+
+  // Pack largest-first: placing big sprites while free space is least fragmented tends to yield a
+  // tighter overall layout than packing in arbitrary input order.
+  std::expected<PackLayout, std::string> pack_sprites(const std::vector<Sprite> &unique_images,
+                                                      const std::vector<TrimRect> &unique_trims,
+                                                      const std::vector<std::string> &names, int max_w, int max_h,
+                                                      int padding, bool pot) {
+    std::vector<int> pack_order(unique_images.size());
+    std::ranges::iota(pack_order, 0);
+    std::ranges::sort(pack_order, [&unique_trims](int a, int b) {
+      const auto &ta = unique_trims[static_cast<std::size_t>(a)];
+      const auto &tb = unique_trims[static_cast<std::size_t>(b)];
+      return std::max(ta.w, ta.h) > std::max(tb.w, tb.h);
+    });
+
+    PackLayout layout;
+    layout.placements.resize(unique_images.size());
+    std::vector<MaxRectsPacker> packers;
+    std::vector<std::pair<int, int>> used_bounds;
+
+    for (const int idx : pack_order) {
+      const auto &trim = unique_trims[static_cast<std::size_t>(idx)];
+      const int req_w{trim.w + padding};
+      const int req_h{trim.h + padding};
+
+      std::optional<PackedRect> rect;
+      if (!packers.empty())
+        rect = packers.back().insert(req_w, req_h);
+
+      int sheet_index{static_cast<int>(packers.size()) - 1};
+      if (!rect) {
+        packers.emplace_back(max_w, max_h);
+        used_bounds.emplace_back(0, 0);
+        sheet_index = static_cast<int>(packers.size()) - 1;
+        rect = packers[static_cast<std::size_t>(sheet_index)].insert(req_w, req_h);
+        if (!rect)
+          return std::unexpected(std::format("Internal error: sprite '{}' failed to pack into an empty sheet",
+                                             names[static_cast<std::size_t>(idx)]));
+      }
+
+      layout.placements[static_cast<std::size_t>(idx)] = Placement{
+          .sheet_index = sheet_index,
+          .rect = PackedRect{.x = rect->x, .y = rect->y, .w = trim.w, .h = trim.h},
+      };
+      auto &bounds = used_bounds[static_cast<std::size_t>(sheet_index)];
+      bounds.first = std::max(bounds.first, rect->x + trim.w);
+      bounds.second = std::max(bounds.second, rect->y + trim.h);
+    }
+
+    layout.num_sheets = static_cast<int>(packers.size());
+    layout.sheet_sizes.reserve(used_bounds.size());
+    for (const auto &[w, h] : used_bounds) {
+      int sw{std::max(1, w)};
+      int sh{std::max(1, h)};
+      if (pot) {
+        sw = next_power_of_two(sw);
+        sh = next_power_of_two(sh);
+      }
+      layout.sheet_sizes.emplace_back(sw, sh);
+    }
+    return layout;
   }
 
 } // namespace
 
 std::expected<PackData, std::string> PackData::from_options(const Options &options) {
   const fs::path source_dir{options.input};
-  if (!fs::exists(source_dir) || !fs::is_directory(source_dir))
-    return std::unexpected(std::format("Source directory does not exist: {}", options.input));
+  if (auto result = require_directory(source_dir, "Source", options.input); !result)
+    return std::unexpected(result.error());
 
   const fs::path sheets_dir{options.sheets};
-  if (!fs::exists(sheets_dir) || !fs::is_directory(sheets_dir))
-    return std::unexpected(std::format("Sheets directory does not exist: {}", options.sheets));
+  if (auto result = require_directory(sheets_dir, "Sheets", options.sheets); !result)
+    return std::unexpected(result.error());
 
   fs::path assets_dir = sheets_dir;
   if (!options.assets.empty()) {
     assets_dir = fs::path{options.assets};
-    if (!fs::exists(assets_dir) || !fs::is_directory(assets_dir))
-      return std::unexpected(std::format("Assets directory does not exist: {}", options.assets));
+    if (auto result = require_directory(assets_dir, "Assets", options.assets); !result)
+      return std::unexpected(result.error());
   }
 
   const auto max_size = parse_size_or_default(options.max_size, k_default_max_atlas_dim, k_default_max_atlas_dim);
@@ -158,105 +305,16 @@ std::expected<PackData, std::string> PackData::from_options(const Options &optio
   if (!images)
     return std::unexpected(images.error());
 
-  std::vector<TrimRect> trims(images->size());
-  std::vector<std::string> names(images->size());
-  for (std::size_t i = 0; i < images->size(); ++i) {
-    trims[i] = compute_trim((*images)[i]);
-    names[i] = (*images)[i].name;
-    if (trims[i].w + padding > max_w || trims[i].h + padding > max_h)
-      return std::unexpected(std::format(
-          "Sprite '{}' ({}x{} after trimming) plus padding ({}) exceeds --max-size {}x{}; increase --max-size, "
-          "reduce --padding, or split the sprite",
-          names[i], trims[i].w, trims[i].h, padding, max_w, max_h));
-  }
+  auto trimmed = compute_trims_and_validate(*images, padding, max_w, max_h);
+  if (!trimmed)
+    return std::unexpected(trimmed.error());
 
-  // Deduplicate by trimmed pixel content: identical frames reused across states (e.g. an idle
-  // frame shared with an attack-recovery frame) are packed once and every referencing name in the
-  // exported metadata points at that single packed instance.
-  std::vector<Sprite> unique_images;
-  std::vector<TrimRect> unique_trims;
-  std::vector<int> sprite_unique_index(images->size());
-  std::unordered_map<std::size_t, std::vector<int>> hash_buckets;
+  auto dedup = deduplicate_sprites(*images, trimmed->trims);
 
-  for (std::size_t i = 0; i < images->size(); ++i) {
-    const std::size_t hash{compute_content_hash((*images)[i], trims[i])};
-    int found{-1};
-    if (auto it = hash_buckets.find(hash); it != hash_buckets.end()) {
-      for (const int idx : it->second) {
-        if (trimmed_content_equal((*images)[i], trims[i], unique_images[static_cast<std::size_t>(idx)],
-                                  unique_trims[static_cast<std::size_t>(idx)])) {
-          found = idx;
-          break;
-        }
-      }
-    }
-    if (found >= 0) {
-      sprite_unique_index[i] = found;
-    } else {
-      unique_trims.push_back(trims[i]);
-      unique_images.push_back(std::move((*images)[i]));
-      const int new_idx{static_cast<int>(unique_images.size()) - 1};
-      hash_buckets[hash].push_back(new_idx);
-      sprite_unique_index[i] = new_idx;
-    }
-  }
-
-  // Pack largest-first: placing big sprites while free space is least fragmented tends to yield a
-  // tighter overall layout than packing in arbitrary input order.
-  std::vector<int> pack_order(unique_images.size());
-  std::iota(pack_order.begin(), pack_order.end(), 0);
-  std::ranges::sort(pack_order, [&unique_trims](int a, int b) {
-    const auto &ta = unique_trims[static_cast<std::size_t>(a)];
-    const auto &tb = unique_trims[static_cast<std::size_t>(b)];
-    return std::max(ta.w, ta.h) > std::max(tb.w, tb.h);
-  });
-
-  struct Placement {
-    int sheet_index{-1};
-    PackedRect rect;
-  };
-
-  std::vector<Placement> placements(unique_images.size());
-  std::vector<MaxRectsPacker> packers;
-  std::vector<std::pair<int, int>> used_bounds;
-
-  for (const int idx : pack_order) {
-    const auto &trim = unique_trims[static_cast<std::size_t>(idx)];
-    const int req_w{trim.w + padding};
-    const int req_h{trim.h + padding};
-
-    std::optional<PackedRect> rect;
-    if (!packers.empty())
-      rect = packers.back().insert(req_w, req_h);
-
-    int sheet_index{static_cast<int>(packers.size()) - 1};
-    if (!rect) {
-      packers.emplace_back(max_w, max_h);
-      used_bounds.emplace_back(0, 0);
-      sheet_index = static_cast<int>(packers.size()) - 1;
-      rect = packers[static_cast<std::size_t>(sheet_index)].insert(req_w, req_h);
-      if (!rect)
-        return std::unexpected(std::format("Internal error: sprite '{}' failed to pack into an empty sheet",
-                                           names[static_cast<std::size_t>(idx)]));
-    }
-
-    placements[static_cast<std::size_t>(idx)] = Placement{sheet_index, PackedRect{rect->x, rect->y, trim.w, trim.h}};
-    auto &bounds = used_bounds[static_cast<std::size_t>(sheet_index)];
-    bounds.first = std::max(bounds.first, rect->x + trim.w);
-    bounds.second = std::max(bounds.second, rect->y + trim.h);
-  }
-
-  std::vector<std::pair<int, int>> sheet_sizes;
-  sheet_sizes.reserve(used_bounds.size());
-  for (const auto &[w, h] : used_bounds) {
-    int sw{std::max(1, w)};
-    int sh{std::max(1, h)};
-    if (options.pot) {
-      sw = next_power_of_two(sw);
-      sh = next_power_of_two(sh);
-    }
-    sheet_sizes.emplace_back(sw, sh);
-  }
+  auto layout =
+      pack_sprites(dedup.unique_images, dedup.unique_trims, trimmed->names, max_w, max_h, padding, options.pot);
+  if (!layout)
+    return std::unexpected(layout.error());
 
   const auto pivot = resolve_pivot(options.pivot);
   if (!pivot)
@@ -265,13 +323,13 @@ std::expected<PackData, std::string> PackData::from_options(const Options &optio
   std::vector<PackedSprite> sprites;
   sprites.reserve(images->size());
   for (std::size_t i = 0; i < images->size(); ++i) {
-    const int uidx{sprite_unique_index[i]};
-    const auto &placement = placements[static_cast<std::size_t>(uidx)];
-    const auto &unique_sprite = unique_images[static_cast<std::size_t>(uidx)];
-    const auto &unique_trim = unique_trims[static_cast<std::size_t>(uidx)];
+    const int uidx{dedup.sprite_unique_index[i]};
+    const auto &placement = layout->placements[static_cast<std::size_t>(uidx)];
+    const auto &unique_sprite = dedup.unique_images[static_cast<std::size_t>(uidx)];
+    const auto &unique_trim = dedup.unique_trims[static_cast<std::size_t>(uidx)];
 
     sprites.push_back(PackedSprite{
-        .name = names[i],
+        .name = trimmed->names[i],
         .sheet_index = placement.sheet_index,
         .x = placement.rect.x,
         .y = placement.rect.y,
@@ -286,25 +344,23 @@ std::expected<PackData, std::string> PackData::from_options(const Options &optio
     });
   }
 
-  const int num_sheets{static_cast<int>(packers.size())};
-
   return PackData{
       .sheets_dir = sheets_dir,
       .assets_dir = std::move(assets_dir),
       .output_name = options.name,
       .full_canvas_pivot = pivot->full_canvas,
-      .unique_images = std::move(unique_images),
-      .unique_trims = std::move(unique_trims),
+      .unique_images = std::move(dedup.unique_images),
+      .unique_trims = std::move(dedup.unique_trims),
       .sprites = std::move(sprites),
-      .sprite_unique_index = std::move(sprite_unique_index),
-      .sheet_sizes = std::move(sheet_sizes),
-      .num_sheets = num_sheets,
+      .sprite_unique_index = std::move(dedup.sprite_unique_index),
+      .sheet_sizes = std::move(layout->sheet_sizes),
+      .num_sheets = layout->num_sheets,
   };
 }
 
 std::expected<void, std::string> Atlas::write(const std::filesystem::path &path) const {
   const unsigned err{lodepng::encode(path.string(), data, static_cast<unsigned>(width), static_cast<unsigned>(height))};
-  if (err) {
+  if (err != 0u) {
     return std::unexpected(std::format("Failed to write PNG: {} ({})", path.string(), lodepng_error_text(err)));
   }
   return {};

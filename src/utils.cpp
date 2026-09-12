@@ -12,6 +12,7 @@
 #include <format>
 #include <iterator>
 #include <map>
+#include <optional>
 #include <ranges>
 #include <regex>
 #include <set>
@@ -31,7 +32,7 @@ std::regex glob_to_regex(std::string_view pattern) {
   bool next_is_bracket_start = false;
   std::size_t bracket_chars = 0;
 
-  for (char c : pattern) {
+  for (const char c : pattern) {
     const bool is_bracket_start{next_is_bracket_start};
     next_is_bracket_start = false;
 
@@ -64,7 +65,7 @@ std::regex glob_to_regex(std::string_view pattern) {
           bracket_chars = 0;
           break;
         default:
-          if (k_regex_meta.find(c) != std::string_view::npos)
+          if (k_regex_meta.contains(c))
             re += '\\';
           re += c;
           break;
@@ -88,7 +89,8 @@ std::expected<std::tuple<int, int>, std::string> parse_size(std::string_view siz
   if (pos == std::string_view::npos) {
     return std::unexpected(std::format("Invalid size format '{}'. Use 'WxH' (e.g., '64x64')", size_str));
   }
-  int w{}, h{};
+  int w{};
+  int h{};
   const char *begin{size_str.data()};
   const char *mid{begin + pos};
   const char *end{begin + size_str.size()};
@@ -145,24 +147,25 @@ namespace {
 
 std::expected<Pivot, std::string> resolve_pivot(std::string_view preset) {
   if (preset == "bottom-center")
-    return Pivot{k_half, 1.0, false};
+    return Pivot{.x = k_half, .y = 1.0, .full_canvas = false};
   if (preset == "center")
-    return Pivot{k_half, k_half, false};
+    return Pivot{.x = k_half, .y = k_half, .full_canvas = false};
   if (preset == "top-center")
-    return Pivot{k_half, 0.0, false};
+    return Pivot{.x = k_half, .y = 0.0, .full_canvas = false};
   if (preset == "top-left")
-    return Pivot{0.0, 0.0, false};
+    return Pivot{.x = 0.0, .y = 0.0, .full_canvas = false};
 
   if (preset.starts_with(k_full_canvas)) {
     if (preset == k_full_canvas)
-      return Pivot{k_half, 0.0, true}; // full-canvas bottom-center
+      return Pivot{.x = k_half, .y = 0.0, .full_canvas = true}; // full-canvas bottom-center
 
     const std::string_view suffix{preset.substr(k_full_canvas.size())};
     if (!suffix.starts_with(':'))
       return std::unexpected(invalid_pivot_message(preset));
     const std::string_view value{suffix.substr(1)};
 
-    double px{k_half}, py{0.0};
+    double px{k_half};
+    double py{0.0};
     if (const auto comma = value.find(','); comma != std::string_view::npos) {
       auto x = parse_double(value.substr(0, comma), "--pivot");
       if (!x)
@@ -178,77 +181,95 @@ std::expected<Pivot, std::string> resolve_pivot(std::string_view preset) {
         return std::unexpected(y.error());
       py = *y;
     }
-    return Pivot{px, py, true};
+    return Pivot{.x = px, .y = py, .full_canvas = true};
   }
 
   return std::unexpected(invalid_pivot_message(preset));
 }
 
-std::expected<std::vector<std::string>, std::string> resolve_input_files(const std::filesystem::path &source_dir,
-                                                                         std::string_view files_str) {
-  constexpr std::string_view k_valid_extension = ".png";
-  std::vector<std::string> input_files;
-  std::unordered_set<std::string> seen;
+namespace {
+  constexpr std::string_view k_valid_extension{".png"};
 
-  auto add_file = [&seen, &input_files](const std::filesystem::path &p) {
-    const std::string s{p.string()};
-    if (seen.insert(s).second)
-      input_files.push_back(s);
-  };
-
-  auto ext_matches = [&k_valid_extension](const std::filesystem::path &p) {
+  bool has_png_extension(const std::filesystem::path &p) {
     auto ext = p.extension().string();
     std::ranges::transform(ext, ext.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     return ext == k_valid_extension;
-  };
+  }
 
-  if (files_str.empty()) {
+  void add_unique_file(std::vector<std::string> &files, std::unordered_set<std::string> &seen,
+                       const std::filesystem::path &p) {
+    const std::string s{p.string()};
+    if (seen.insert(s).second)
+      files.push_back(s);
+  }
+
+  std::string_view trim_token(std::string_view token) {
+    const auto first = token.find_first_not_of(" \t");
+    if (first == std::string_view::npos)
+      return {};
+    const auto last = token.find_last_not_of(" \t");
+    return token.substr(first, last - first + 1);
+  }
+
+  std::expected<std::vector<std::filesystem::path>, std::string> list_png_files(const std::filesystem::path &source_dir,
+                                                                                const std::regex *filter) {
     std::vector<std::filesystem::path> matches;
     std::error_code ec;
     for (const auto &entry : std::filesystem::directory_iterator(source_dir, ec)) {
       std::error_code status_ec;
-      if (entry.is_regular_file(status_ec) && !status_ec && ext_matches(entry.path()))
-        matches.push_back(entry.path());
+      if (!entry.is_regular_file(status_ec) || status_ec)
+        continue;
+      const auto &path = entry.path();
+      if (has_png_extension(path) && (filter == nullptr || std::regex_match(path.filename().string(), *filter)))
+        matches.push_back(path);
     }
     if (ec)
       return std::unexpected(std::format("Cannot read directory '{}': {}", source_dir.string(), ec.message()));
     std::ranges::sort(matches, {}, [](const std::filesystem::path &p) { return p.filename().string(); });
-    for (const auto &p : matches)
-      add_file(p);
-  } else {
-    for (auto token_range : files_str | std::views::split(',')) {
-      std::string_view token(token_range.begin(), token_range.end());
-      const auto first = token.find_first_not_of(" \t");
-      if (first == std::string_view::npos)
-        continue;
-      const auto last = token.find_last_not_of(" \t");
-      token = token.substr(first, last - first + 1);
+    return matches;
+  }
 
-      const std::filesystem::path exact = source_dir / token;
-      std::error_code exact_ec;
-      if (std::filesystem::exists(exact) && std::filesystem::is_regular_file(exact, exact_ec) && !exact_ec) {
-        if (!ext_matches(exact)) {
-          return std::unexpected(
-              std::format("File '{}' is not a PNG file (extension: {})", token, exact.extension().string()));
-        }
-        add_file(exact);
-      } else {
-        const std::regex re{glob_to_regex(token)};
-        std::vector<std::filesystem::path> matches;
-        std::error_code ec;
-        for (const auto &entry : std::filesystem::directory_iterator(source_dir, ec)) {
-          std::error_code status_ec;
-          if (!entry.is_regular_file(status_ec) || status_ec)
-            continue;
-          if (ext_matches(entry.path()) && std::regex_match(entry.path().filename().string(), re))
-            matches.push_back(entry.path());
-        }
-        if (ec)
-          return std::unexpected(std::format("Cannot read directory '{}': {}", source_dir.string(), ec.message()));
-        std::ranges::sort(matches, {}, [](const std::filesystem::path &p) { return p.filename().string(); });
-        for (const auto &p : matches)
-          add_file(p);
-      }
+  std::expected<void, std::string> add_token_matches(const std::filesystem::path &source_dir, std::string_view token,
+                                                     std::vector<std::string> &input_files,
+                                                     std::unordered_set<std::string> &seen) {
+    const std::filesystem::path exact = source_dir / token;
+    std::error_code exact_ec;
+    if (std::filesystem::exists(exact) && std::filesystem::is_regular_file(exact, exact_ec) && !exact_ec) {
+      if (!has_png_extension(exact))
+        return std::unexpected(
+            std::format("File '{}' is not a PNG file (extension: {})", token, exact.extension().string()));
+      add_unique_file(input_files, seen, exact);
+      return {};
+    }
+
+    const std::regex re{glob_to_regex(token)};
+    auto matches = list_png_files(source_dir, &re);
+    if (!matches)
+      return std::unexpected(matches.error());
+    for (const auto &p : *matches)
+      add_unique_file(input_files, seen, p);
+    return {};
+  }
+} // namespace
+
+std::expected<std::vector<std::string>, std::string> resolve_input_files(const std::filesystem::path &source_dir,
+                                                                         std::string_view files_str) {
+  std::vector<std::string> input_files;
+  std::unordered_set<std::string> seen;
+
+  if (files_str.empty()) {
+    auto matches = list_png_files(source_dir, nullptr);
+    if (!matches)
+      return std::unexpected(matches.error());
+    for (const auto &p : *matches)
+      add_unique_file(input_files, seen, p);
+  } else {
+    for (const auto token_range : files_str | std::views::split(',')) {
+      const std::string_view token = trim_token(std::string_view(token_range.begin(), token_range.end()));
+      if (token.empty())
+        continue;
+      if (auto result = add_token_matches(source_dir, token, input_files, seen); !result)
+        return std::unexpected(result.error());
     }
   }
 
@@ -259,27 +280,55 @@ std::expected<std::vector<std::string>, std::string> resolve_input_files(const s
   return input_files;
 }
 
-std::expected<void, std::string> validate_animation_naming(const std::vector<std::string> &files) {
-  // group key: "<unit>_<state>", facing -> set of frame indices present for that facing.
-  std::map<std::string, std::map<std::string, std::set<int>>> groups;
+namespace {
+  struct AnimationName {
+    std::string unit;
+    std::string state;
+    std::string facing;
+    int frame{};
+  };
 
-  for (const auto &file : files) {
+  std::optional<AnimationName> parse_animation_name(std::string_view file) {
     const std::string stem = std::filesystem::path(file).stem().string();
     std::vector<std::string_view> tokens;
-    for (auto part : stem | std::views::split('_'))
+    for (const auto part : stem | std::views::split('_'))
       tokens.emplace_back(part.begin(), part.end());
     if (tokens.size() != 4)
-      continue;
+      return std::nullopt;
 
     int frame{};
     const std::string_view frame_tok{tokens[3]};
     const auto [ptr, ec] = std::from_chars(frame_tok.data(), frame_tok.data() + frame_tok.size(), frame);
     if (ec != std::errc{} || ptr != frame_tok.data() + frame_tok.size())
-      continue;
+      return std::nullopt;
 
-    const std::string group_key{std::format("{}_{}", tokens[0], tokens[1])};
-    const std::string facing{tokens[2]};
-    groups[group_key][facing].insert(frame);
+    return AnimationName{
+        .unit = std::string{tokens[0]},
+        .state = std::string{tokens[1]},
+        .facing = std::string{tokens[2]},
+        .frame = frame,
+    };
+  }
+
+  std::string format_missing_frames(const std::string &group_key, const std::string &facing,
+                                    const std::vector<int> &missing) {
+    std::string missing_list;
+    for (std::size_t i = 0; i < missing.size(); ++i)
+      missing_list += (i == 0 ? "" : ", ") + std::to_string(missing[i]);
+    return std::format("{}: facing '{}' is missing frame(s) {} (present in other facings)", group_key, facing,
+                       missing_list);
+  }
+} // namespace
+
+std::expected<void, std::string> validate_animation_naming(const std::vector<std::string> &files) {
+  // group key: "<unit>_<state>", facing -> set of frame indices present for that facing.
+  std::map<std::string, std::map<std::string, std::set<int>>> groups;
+
+  for (const auto &file : files) {
+    const auto parsed = parse_animation_name(file);
+    if (!parsed)
+      continue;
+    groups[std::format("{}_{}", parsed->unit, parsed->state)][parsed->facing].insert(parsed->frame);
   }
 
   std::vector<std::string> issues;
@@ -294,21 +343,16 @@ std::expected<void, std::string> validate_animation_naming(const std::vector<std
     for (const auto &[facing, frames] : facings) {
       std::vector<int> missing;
       std::ranges::set_difference(reference, frames, std::back_inserter(missing));
-      if (!missing.empty()) {
-        std::string missing_list;
-        for (std::size_t i = 0; i < missing.size(); ++i)
-          missing_list += (i == 0 ? "" : ", ") + std::to_string(missing[i]);
-        issues.push_back(std::format("{}: facing '{}' is missing frame(s) {} (present in other facings)", group_key,
-                                     facing, missing_list));
-      }
+      if (!missing.empty())
+        issues.push_back(format_missing_frames(group_key, facing, missing));
     }
   }
 
-  if (!issues.empty()) {
-    std::string message{"Animation validation failed:"};
-    for (const auto &issue : issues)
-      message += std::format("\n  {}", issue);
-    return std::unexpected(message);
-  }
-  return {};
+  if (issues.empty())
+    return {};
+
+  std::string message{"Animation validation failed:"};
+  for (const auto &issue : issues)
+    message += std::format("\n  {}", issue);
+  return std::unexpected(message);
 }
